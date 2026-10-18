@@ -1,0 +1,350 @@
+{
+  "ahri_ogn": {
+    "name": "Ahri",
+    "title": "Nine-Tailed Fox",
+    "image": "ahri_ogn.png",
+    "faction": "Ionia"
+  },
+  "akali_ven": {
+    "name": "Akali",
+    "title": "Rogue Assassin",
+    "image": "akali_ven.png",
+    "faction": "Ionia"
+  },
+  "ambessa_ven": {
+    "name": "Ambessa",
+    "title": "Matriarch of War",
+    "image": "ambessa_ven.png",
+    "faction": "Noxus"
+  },
+  "annie_ogs": {
+    "name": "Annie",
+    "title": "Dark Child",
+    "image": "annie_ogs.png",
+    "faction": "Noxus"
+  },
+  "azir_sfd": {
+    "name": "Azir",
+    "title": "Emperor of the Sands",
+    "image": "azir_sfd.png",
+    "faction": "Shurima"
+  },
+  "darius_ogn": {
+    "name": "Darius",
+    "title": "Hand of Noxus",
+    "image": "darius_ogn.png",
+    "faction": "Noxus"
+  },
+  "diana_unl": {
+    "name": "Diana",
+    "title": "Scorn of the Moon",
+    "image": "diana_unl.png",
+    "faction": "Mount Targon"
+  },
+  "draven_sfd": {
+    "name": "Draven",
+    "title": "Glorious Executioner",
+    "image": "draven_sfd.png",
+    "faction": "Noxus"
+  },
+  "ekko_rad": {
+    "name": "Ekko",
+    "title": "Boy Who Shattered Time",
+    "image": "ekko_rad.png",
+    "faction": "Zaun"
+  },
+  "evelynn_rad": {
+    "name": "Evelynn",
+    "title": "Agony's Embrace",
+    "image": "evelynn_rad.png",
+    "faction": "Demon"
+  },
+  "ezreal_sfd": {
+    "name": "Ezreal",
+    "title": "Prodigal Explorer",
+    "image": "ezreal_sfd.png",
+    "faction": "Piltover"
+  },
+  "fiora_sfd": {
+    "name": "Fiora",
+    "title": "Grand Duelist",
+    "image": "fiora_sfd.png",
+    "faction": "Demacia"
+  },
+  "garen_ogs": {
+    "name": "Garen",
+    "title": "Might of Demacia",
+    "image": "garen_ogs.png",
+    "faction": "Demacia"
+  },
+  "irelia_sfd": {
+    "name": "Irelia",
+    "title": "Blade Dancer",
+    "image": "irelia_sfd.png",
+    "faction": "Ionia"
+  },
+  "ivern_unl": {
+    "name": "Ivern",
+    "title": "Green Father",
+    "image": "ivern_unl.png",
+    "faction": "Ionia"
+  },
+  "jarvaniv_rad": {
+    "name": "Jarvan IV",
+    "title": "Exemplar of Demacia",
+    "image": "jarvaniv_rad.png",
+    "faction": "Demacia"
+  },
+  "jax_sfd": {
+    "name": "Jax",
+    "title": "Grandmaster at Arms",
+    "image": "jax_sfd.png",
+    "faction": "Ionia"
+  },
+  "jayce_ven": {
+    "name": "Jayce",
+    "title": "Defender of Tomorrow",
+    "image": "jayce_ven.png",
+    "faction": "Piltover"
+  },
+  "jhin_unl": {
+    "name": "Jhin",
+    "title": "Virtuoso",
+    "image": "jhin_unl.png",
+    "faction": "Ionia"
+  },
+  "jinx_ogn": {
+    "name": "Jinx",
+    "title": "Loose Cannon",
+    "image": "jinx_ogn.png",
+    "faction": "Zaun"
+  },
+  "kaisa_ogn": {
+    "name": "Kai'Sa",
+    "title": "Daughter of the Void",
+    "image": "kaisa_ogn.png",
+    "faction": "The Void"
+  },
+  "kennen_ven": {
+    "name": "Kennen",
+    "title": "Heart of the Tempest",
+    "image": "kennen_ven.png",
+    "faction": "Ionia"
+  },
+  "khazix_unl": {
+    "name": "Kha'Zix",
+    "title": "Voidreaver",
+    "image": "khazix_unl.png",
+    "faction": "The Void"
+  },
+  "ksante_rad": {
+    "name": "K'Sante",
+    "title": "Pride of Nazumah",
+    "image": "ksante_rad.png",
+    "faction": "Shurima"
+  },
+  "leblanc_unl": {
+    "name": "LeBlanc",
+    "title": "Deceiver",
+    "image": "leblanc_unl.png",
+    "faction": "Noxus"
+  },
+  "leesin_ogn": {
+    "name": "Lee Sin",
+    "title": "Blind Monk",
+    "image": "leesin_ogn.png",
+    "faction": "Ionia"
+  },
+  "leona_ogn": {
+    "name": "Leona",
+    "title": "Radiant Dawn",
+    "image": "leona_ogn.png",
+    "faction": "Mount Targon"
+  },
+  "lillia_unl": {
+    "name": "Lillia",
+    "title": "Bashful Bloom",
+    "image": "lillia_unl.png",
+    "faction": "Ionia"
+  },
+  "lucian_sfd": {
+    "name": "Lucian",
+    "title": "Purifier",
+    "image": "lucian_sfd.png",
+    "faction": "Demacia"
+  },
+  "lux_ogs": {
+    "name": "Lux",
+    "title": "Lady of Luminosity",
+    "image": "lux_ogs.png",
+    "faction": "Demacia"
+  },
+  "masteryi_ogs": {
+    "name": "Master Yi",
+    "title": "Wuju Bladesman",
+    "image": "masteryi_ogs.png",
+    "faction": "Ionia"
+  },
+  "masteryi_unl": {
+    "name": "Master Yi",
+    "title": "Wuju Master",
+    "image": "masteryi_unl.png",
+    "faction": "Ionia"
+  },
+  "mel": {
+    "name": "Mel",
+    "title": "Soul's Reflection",
+    "image": "mel.png",
+    "faction": "Noxus"
+  },
+  "missfortune_ogn": {
+    "name": "Miss Fortune",
+    "title": "Bounty Hunter",
+    "image": "missfortune_ogn.png",
+    "faction": "Bilgewater"
+  },
+  "mordekaiser_rad": {
+    "name": "Mordekaiser",
+    "title": "Iron Revenant",
+    "image": "mordekaiser_rad.png",
+    "faction": "Noxus"
+  },
+  "nasus_ven": {
+    "name": "Nasus",
+    "title": "Curator of the Sands",
+    "image": "nasus_ven.png",
+    "faction": "Shurima"
+  },
+  "orianna_rad": {
+    "name": "Orianna",
+    "title": "Lady of Clockwork",
+    "image": "orianna_rad.png",
+    "faction": "Piltover"
+  },
+  "ornn_sfd": {
+    "name": "Ornn",
+    "title": "Fire Below the Mountain",
+    "image": "ornn_sfd.png",
+    "faction": "Freljord"
+  },
+  "poppy_unl": {
+    "name": "Poppy",
+    "title": "Keeper of the Hammer",
+    "image": "poppy_unl.png",
+    "faction": "Demacia"
+  },
+  "pyke_unl": {
+    "name": "Pyke",
+    "title": "Bloodharbor Ripper",
+    "image": "pyke_unl.png",
+    "faction": "Bilgewater"
+  },
+  "reksai_sfd": {
+    "name": "Rek'Sai",
+    "title": "Void Burrower",
+    "image": "reksai_sfd.png",
+    "faction": "The Void"
+  },
+  "renataglasc_sfd": {
+    "name": "Renata Glasc",
+    "title": "Chem-Baroness",
+    "image": "renataglasc_sfd.png",
+    "faction": "Zaun"
+  },
+  "renekton_ven": {
+    "name": "Renekton",
+    "title": "Butcher of the Sands",
+    "image": "renekton_ven.png",
+    "faction": "Shurima"
+  },
+  "rengar_unl": {
+    "name": "Rengar",
+    "title": "Pridestalker",
+    "image": "rengar_unl.png",
+    "faction": "Iztal"
+  },
+  "riven_rad": {
+    "name": "Riven",
+    "title": "The Exile",
+    "image": "riven_rad.png",
+    "faction": "Noxus"
+  },
+  "rumble_sfd": {
+    "name": "Rumble",
+    "title": "Mechanized Menace",
+    "image": "rumble_sfd.png",
+    "faction": "Bandle City"
+  },
+  "seraphine_rad": {
+    "name": "Seraphine",
+    "title": "Starry-Eyed Songstress",
+    "image": "seraphine_rad.png",
+    "faction": "Piltover"
+  },
+  "sett_ogn": {
+    "name": "Sett",
+    "title": "The Boss",
+    "image": "sett_ogn.png",
+    "faction": "Ionia"
+  },
+  "shen_ven": {
+    "name": "Shen",
+    "title": "Eye of Twilight",
+    "image": "shen_ven.png",
+    "faction": "Ionia"
+  },
+  "sivir_sfd": {
+    "name": "Sivir",
+    "title": "Battle Mistress",
+    "image": "sivir_sfd.png",
+    "faction": "Shurima"
+  },
+  "teemo_ogn": {
+    "name": "Teemo",
+    "title": "Swift Scout",
+    "image": "teemo_ogn.png",
+    "faction": "Bandle City"
+  },
+  "vex_unl": {
+    "name": "Vex",
+    "title": "Gloomist",
+    "image": "vex_unl.png",
+    "faction": "Shadow Isles"
+  },
+  "vi_unl": {
+    "name": "Vi",
+    "title": "Piltover Enforcer",
+    "image": "vi_unl.png",
+    "faction": "Piltover"
+  },
+  "viktor_ogn": {
+    "name": "Viktor",
+    "title": "Herald of the Arcane",
+    "image": "viktor_ogn.png",
+    "faction": "Zaun"
+  },
+  "volibear_ogn": {
+    "name": "Volibear",
+    "title": "Relentless Storm",
+    "image": "volibear_ogn.png",
+    "faction": "Freljord"
+  },
+  "yasuo_ogn": {
+    "name": "Yasuo",
+    "title": "Unforgiven",
+    "image": "yasuo_ogn.png",
+    "faction": "Ionia"
+  },
+  "zed_ven": {
+    "name": "Zed",
+    "title": "Master of Shadows",
+    "image": "zed_ven.png",
+    "faction": "Ionia"
+  },
+  "ziggs_rad": {
+    "name": "Ziggs",
+    "title": "Hexplosives Expert",
+    "image": "ziggs_rad.png",
+    "faction": "Zaun"
+  }
+}

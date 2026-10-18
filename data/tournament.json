@@ -1,0 +1,21 @@
+{
+  "tournament": {
+    "name": "Vendetta 2nd Skirmish",
+    "date": "",
+    "players": 15
+  },
+  "legends": {
+    "leblanc_unl": 2,
+    "kennen_ven": 2,
+    "rengar_unl": 2,
+    "poppy_unl": 1,
+    "kaisa_ogn": 1,
+    "lucian_sfd": 1,
+    "nasus_ven": 1,
+    "khazix_unl": 1,
+    "irelia_sfd": 1,
+    "ornn_sfd": 1,
+    "vex_unl": 1,
+    "viktor_ogn": 1
+  }
+}
