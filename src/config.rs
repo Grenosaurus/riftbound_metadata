@@ -11,16 +11,11 @@ pub const GRID_BOTTOM: f32 = 1010.0;
 pub const GAP: f32 = 14.0;
 pub const MIN_TILE_WIDTH: f32 = 220.0;
 pub const MAX_TILE_WIDTH: f32 = 600.0;
-pub const MIN_TILE_HEIGHT: f32 = 170.0;
-pub const MAX_TILE_HEIGHT: f32 = 350.0;
 pub const BORDER_RADIUS: f32 = 18.0;
 pub const BORDER_WIDTH: f32 = 3.0;
 
-
-pub fn faction_color(faction: &str) -> &'static str
-{
-    match faction
-    {
+pub fn faction_color(faction: &str) -> &'static str {
+    match faction {
         "Ionia" => "#39e911",
         "Noxus" => "#C84B55",
         "Piltover" => "#D8A84E",

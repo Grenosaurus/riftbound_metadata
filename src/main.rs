@@ -4,18 +4,24 @@ mod layout;
 mod models;
 mod renderer;
 
-use anyhow::{Context, Result};
-use clap::Parser;
-use std::{collections::HashMap, fs, path::{Path, PathBuf}};
 use crate::layout::build_layout;
 use crate::models::{Legend, TournamentFile};
 use crate::renderer::render_svg;
-
+use anyhow::{Context, Result};
+use clap::Parser;
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Parser, Debug)]
-#[command(name = "riftbound_meta", version, about = "Generate a Riftbound Legend meta breakdown PNG.")]
-struct Args
-{
+#[command(
+    name = "riftbound_meta",
+    version,
+    about = "Generate a Riftbound Legend meta breakdown PNG."
+)]
+struct Args {
     #[arg(default_value = "data/tournament.json")]
     tournament: PathBuf,
     #[arg(long, default_value = "data/legends.json")]
@@ -34,41 +40,46 @@ struct Args
     refresh_artwork: bool,
 }
 
-
-fn load_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T>
-{
-    let contents = fs::read_to_string(path).with_context(|| format!("Could not read {}", path.display()))?;
-    serde_json::from_str(&contents).with_context(|| format!("Could not parse JSON in {}", path.display()))
+fn load_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
+    let contents =
+        fs::read_to_string(path).with_context(|| format!("Could not read {}", path.display()))?;
+    serde_json::from_str(&contents)
+        .with_context(|| format!("Could not parse JSON in {}", path.display()))
 }
 
-
-fn main() -> Result<()>
-{
+fn main() -> Result<()> {
     let args = Args::parse();
     let tournament: TournamentFile = load_json(&args.tournament)?;
     let legend_db: HashMap<String, Legend> = load_json(&args.legends)?;
     let tournament_keys: Vec<String> = tournament.legends.keys().cloned().collect();
 
-    if !args.skip_artwork
-    {
-        if let Err(err) = artwork::sync_artwork(&legend_db, &tournament_keys, &args.assets, args.refresh_artwork)
-        {
+    if !args.skip_artwork {
+        if let Err(err) = artwork::sync_artwork(
+            &legend_db,
+            &tournament_keys,
+            &args.assets,
+            args.refresh_artwork,
+        ) {
             eprintln!("Warning: artwork sync failed: {err:#}");
-            eprintln!("Continuing with any artwork already cached in {}.", args.assets.display());
+            eprintln!(
+                "Continuing with any artwork already cached in {}.",
+                args.assets.display()
+            );
         }
     }
 
     let mut legends = Vec::new();
 
-    for (key, count) in &tournament.legends
-    {
-        if !legend_db.contains_key(key)
-        {
+    for (key, count) in &tournament.legends {
+        if !legend_db.contains_key(key) {
             eprintln!("Warning: '{}' is missing from legends.json; skipping.", key);
             continue;
         }
 
-        legends.push(layout::LegendCount { key: key.clone(), count: *count });
+        legends.push(layout::LegendCount {
+            key: key.clone(),
+            count: *count,
+        });
     }
 
     legends.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.key.cmp(&b.key)));
@@ -76,30 +87,37 @@ fn main() -> Result<()>
     let tiles = build_layout(&legends);
     let svg = render_svg(&tournament.tournament, &legend_db, &tiles, &args.assets)?;
 
-    if let Some(parent) = args.output.parent()
-    {
+    if let Some(parent) = args.output.parent() {
         fs::create_dir_all(parent)?;
     }
 
-    let svg_path = args.svg.unwrap_or_else(|| args.output.with_extension("svg"));
+    let svg_path = args
+        .svg
+        .unwrap_or_else(|| args.output.with_extension("svg"));
 
-    if let Some(parent) = svg_path.parent()
-    {
+    if let Some(parent) = svg_path.parent() {
         fs::create_dir_all(parent)?;
     }
 
-    fs::write(&svg_path, &svg).with_context(|| format!("Could not write {}", svg_path.display()))?;
+    fs::write(&svg_path, &svg)
+        .with_context(|| format!("Could not write {}", svg_path.display()))?;
 
     let opt = resvg::usvg::Options::default();
     let tree = resvg::usvg::Tree::from_str(&svg, &opt).context("Could not parse generated SVG")?;
-    let mut pixmap = resvg::tiny_skia::Pixmap::new(config::CANVAS_WIDTH, config::CANVAS_HEIGHT).context("Could not allocate output image")?;
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(config::CANVAS_WIDTH, config::CANVAS_HEIGHT)
+        .context("Could not allocate output image")?;
 
-    resvg::render(&tree, resvg::tiny_skia::Transform::default(), &mut pixmap.as_mut());
-    pixmap.save_png(&args.output).with_context(|| format!("Could not write {}", args.output.display()))?;
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::default(),
+        &mut pixmap.as_mut(),
+    );
+    pixmap
+        .save_png(&args.output)
+        .with_context(|| format!("Could not write {}", args.output.display()))?;
 
     println!("Generated: {}", args.output.display());
     println!("SVG:       {}", svg_path.display());
 
     Ok(())
 }
-

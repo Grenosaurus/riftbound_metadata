@@ -1,182 +1,282 @@
 //! Downloads Legend artwork from Piltover Archive and caches it locally.
-//! The Archive's external API is community-documented/observed, not an official stable contract.
+//! The Archive's external API is community-documented/observed,
+//! not an official stable contract.
 
+use crate::models::Legend;
 use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
 use serde::Deserialize;
-use std::{collections::HashMap, fs, path::{Path, PathBuf}, time::Duration};
-use crate::models::Legend;
+use std::{collections::HashMap, fs, path::Path, time::Duration};
 
 const API_BASE: &str = "https://piltoverarchive.com/api/external/v1";
+const REQUEST_TIMEOUT_SECS: u64 = 30;
+const DOWNLOAD_DELAY_MS: u64 = 120;
+const MAX_PAGES: u32 = 100;
 
 #[derive(Debug, Deserialize)]
-struct ApiResponse
-{
-    #[serde(default)] data: Vec<ApiVariant>,
-    #[serde(default)] pagination: Option<Pagination>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Pagination
-{
-    #[serde(default, rename = "totalPages")] total_pages: Option<u32>,
-    #[serde(default, rename = "hasNext")] has_next: Option<bool>,
+struct ApiResponse {
+    #[serde(default)]
+    data: Vec<ApiVariant>,
+    #[serde(default)]
+    pagination: Option<Pagination>,
 }
 
 #[derive(Debug, Deserialize)]
-struct ApiVariant
-{
-    #[serde(default, rename = "imageUrl")] image_url: Option<String>,
-    #[serde(default, rename = "variantNumber")] variant_number: Option<String>,
-    #[serde(default)] card: Option<ApiCard>,
+struct Pagination {
+    #[serde(default, rename = "totalPages")]
+    total_pages: Option<u32>,
+    #[serde(default, rename = "hasNext")]
+    has_next: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
-struct ApiCard
-{
-    #[serde(default)] name: Option<String>
+struct ApiVariant {
+    #[serde(default, rename = "imageUrl")]
+    image_url: Option<String>,
+    #[serde(default, rename = "variantNumber")]
+    variant_number: Option<String>,
+    #[serde(default)]
+    card: Option<ApiCard>,
 }
 
-
-fn normalize(s: &str) -> String
-{
-    s.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_lowercase).collect()
+#[derive(Debug, Deserialize)]
+struct ApiCard {
+    #[serde(default)]
+    name: Option<String>,
 }
 
+/// Normalize names so punctuation, spaces, and capitalization
+/// do not prevent a match.
+fn normalize(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
 
-fn preferred_set(image_name: &str) -> Option<&'static str>
-{
+/// Extract the preferred set code from the local image filename.
+///
+/// Example: "ahri_ogn.png" -> Some("OGN")
+fn preferred_set(image_name: &str) -> Option<&'static str> {
     let stem = Path::new(image_name).file_stem()?.to_str()?;
     let suffix = stem.rsplit('_').next()?.to_ascii_lowercase();
 
-    match suffix.as_str()
-    {
-        "ogn" => Some("OGN"), "ogs" => Some("OGS"), "sfd" => Some("SFD"),
-        "rad" => Some("RAD"), "ven" => Some("VEN"), "unl" => Some("UNL"),
+    match suffix.as_str() {
+        "ogn" => Some("OGN"),
+        "ogs" => Some("OGS"),
+        "sfd" => Some("SFD"),
+        "rad" => Some("RAD"),
+        "ven" => Some("VEN"),
+        "unl" => Some("UNL"),
         _ => None,
     }
 }
 
-
-fn fetch_all_variants(client: &Client) -> Result<Vec<ApiVariant>>
-{
+/// Fetch all Legend Rare artwork variants from the Archive API.
+fn fetch_all_variants(client: &Client) -> Result<Vec<ApiVariant>> {
     let mut all = Vec::new();
-    let mut page = 1u32;
+    let mut page = 1_u32;
 
-    loop
-    {
-        let url = format!("{API_BASE}/cards");
-        let response = client.get(&url)
-            .query(&[("types", "legend"), ("rarities", "rare"), ("artworks", "all"), ("limit", "100")])
+    loop {
+        let response = client
+            .get(format!("{API_BASE}/cards"))
+            .query(&[
+                ("types", "legend"),
+                ("rarities", "rare"),
+                ("artworks", "all"),
+                ("limit", "100"),
+            ])
             .query(&[("page", page.to_string())])
-            .send().with_context(|| format!("Request to Piltover Archive failed (page {page})"))?
-            .error_for_status().with_context(|| format!("Piltover Archive returned an error (page {page})"))?;
-        let body: ApiResponse = response.json().context("Could not parse Piltover Archive JSON response")?;
+            .send()
+            .with_context(|| format!("Request to Piltover Archive failed (page {page})"))?
+            .error_for_status()
+            .with_context(|| format!("Piltover Archive returned an error (page {page})"))?;
+
+        let body: ApiResponse = response
+            .json()
+            .context("Could not parse Piltover Archive JSON response")?;
+
         let count = body.data.len();
+        let pagination = body.pagination;
 
         all.extend(body.data);
 
-        let pagination = body.pagination;
-        let has_next = pagination.as_ref().and_then(|p| p.has_next)
-            .or_else(|| pagination.as_ref().and_then(|p| p.total_pages).map(|total| page < total))
+        let has_next = pagination
+            .as_ref()
+            .and_then(|p| p.has_next)
+            .or_else(|| {
+                pagination
+                    .as_ref()
+                    .and_then(|p| p.total_pages)
+                    .map(|total| page < total)
+            })
             .unwrap_or(count == 100);
 
-        if !has_next || count == 0
-        {
+        if !has_next || count == 0 {
             break;
         }
 
-        page += 1;
-
-        if page > 100
-        {
-            return Err(anyhow!("Safety stop: Piltover Archive returned too many pages"));
+        if page >= MAX_PAGES {
+            return Err(anyhow!(
+                "Safety stop: Piltover Archive returned too many pages"
+            ));
         }
+
+        page += 1;
     }
 
     Ok(all)
 }
 
+/// Select the best matching card variant for a Legend.
+fn choose_variant<'a>(variants: &'a [ApiVariant], legend: &Legend) -> Option<&'a ApiVariant> {
+    let full_name = format!("{}, {}", legend.name, legend.title);
+    let full_normalized = normalize(&full_name);
+    let name_normalized = normalize(&legend.name);
 
-fn choose_variant<'a>(variants: &'a [ApiVariant], legend: &Legend) -> Option<&'a ApiVariant>
-{
-    let full = format!("{}, {}", legend.name, legend.title);
-    let full_n = normalize(&full);
-    let name_n = normalize(&legend.name);
-    let mut matches: Vec<&ApiVariant> = variants.iter().filter(|v| {
-        v.card.as_ref().and_then(|c| c.name.as_deref()).map(normalize).map(|n| n == full_n || n == name_n).unwrap_or(false)
-            && v.image_url.as_deref().map(|u| u.starts_with("https://") || u.starts_with("http://")).unwrap_or(false)
-    }).collect();
+    let mut matches: Vec<&ApiVariant> = variants
+        .iter()
+        .filter(|variant| {
+            let name_matches = variant
+                .card
+                .as_ref()
+                .and_then(|card| card.name.as_deref())
+                .map(normalize)
+                .map(|name| name == full_normalized || name == name_normalized)
+                .unwrap_or(false);
 
-    if let Some(set) = preferred_set(&legend.image)
-    {
-        if let Some(found) = matches.iter().copied().find(|v| v.variant_number.as_deref().map(|n| n.to_ascii_uppercase().starts_with(set)).unwrap_or(false))
-        {
+            let has_http_image = variant
+                .image_url
+                .as_deref()
+                .map(|url| url.starts_with("https://") || url.starts_with("http://"))
+                .unwrap_or(false);
+
+            name_matches && has_http_image
+        })
+        .collect();
+
+    // Prefer the set code encoded in legends.json, if available.
+    if let Some(set) = preferred_set(&legend.image) {
+        if let Some(found) = matches.iter().copied().find(|variant| {
+            variant
+                .variant_number
+                .as_deref()
+                .map(|number| number.to_ascii_uppercase().starts_with(set))
+                .unwrap_or(false)
+        }) {
             return Some(found);
         }
     }
 
-    // Prefer a normal, non-foil/standard variant if available, otherwise use the first usable image.
-    matches.sort_by_key(|v| {
-        let n = v.variant_number.as_deref().unwrap_or("").to_ascii_uppercase();
-        if n.contains("FOIL") || n.contains("NEXUS") || n.contains("SHOWCASE") { 1 } else { 0 }
+    // Prefer standard variants over foil, Nexus, or Showcase variants.
+    matches.sort_by_key(|variant| {
+        let number = variant
+            .variant_number
+            .as_deref()
+            .unwrap_or("")
+            .to_ascii_uppercase();
+
+        if number.contains("FOIL") || number.contains("NEXUS") || number.contains("SHOWCASE") {
+            1
+        } else {
+            0
+        }
     });
 
     matches.into_iter().next()
 }
 
+/// Download missing artwork for Legends used in the tournament.
+///
+/// If `refresh` is true, download the artwork again even if cached files exist.
+pub fn sync_artwork(
+    legend_db: &HashMap<String, Legend>,
+    tournament_keys: &[String],
+    assets_dir: &Path,
+    refresh: bool,
+) -> Result<()> {
+    fs::create_dir_all(assets_dir)
+        .with_context(|| format!("Could not create {}", assets_dir.display()))?;
 
-pub fn sync_artwork(legend_db: &HashMap<String, Legend>, tournament_keys: &[String], assets_dir: &Path, refresh: bool) -> Result<()>
-{
-    fs::create_dir_all(assets_dir).with_context(|| format!("Could not create {}", assets_dir.display()))?;
-    let needed: Vec<(&String, &Legend)> = tournament_keys.iter().filter_map(|key| legend_db.get(key).map(|legend| (key, legend)))
-        .filter(|(_, legend)| refresh || !assets_dir.join(&legend.image).is_file()).collect();
+    let needed: Vec<(&String, &Legend)> = tournament_keys
+        .iter()
+        .filter_map(|key| legend_db.get(key).map(|legend| (key, legend)))
+        .filter(|(_, legend)| refresh || !assets_dir.join(&legend.image).is_file())
+        .collect();
 
-    if needed.is_empty()
-    {
+    if needed.is_empty() {
         println!("Artwork cache is complete for all Legends in this tournament.");
         return Ok(());
     }
 
-    let client = Client::builder().timeout(Duration::from_secs(30)).user_agent("RiftboundMetaGenerator/0.2 (artwork cache)").build()?;
+    let client = Client::builder()
+        .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .user_agent("RiftboundMetaGenerator/0.2 (artwork cache)")
+        .build()
+        .context("Could not create HTTP client")?;
+
     println!("Fetching Legend card records from Piltover Archive...");
 
     let variants = fetch_all_variants(&client)?;
-    let mut downloaded = 0usize;
+    let mut downloaded = 0_usize;
+    let mut unmatched = 0_usize;
 
-    for (key, legend) in needed
-    {
+    for (key, legend) in needed {
         let target = assets_dir.join(&legend.image);
-        let Some(variant) = choose_variant(&variants, legend) else
-        {
-            eprintln!("Warning: no matching Piltover Archive artwork found for {} ({key}).", legend.name);
+
+        let Some(variant) = choose_variant(&variants, legend) else {
+            eprintln!(
+                "Warning: no matching Piltover Archive artwork found for {} ({key}).",
+                legend.name
+            );
+            unmatched += 1;
             continue;
         };
 
-        let url = variant.image_url.as_deref().ok_or_else(|| anyhow!("Matched variant has no image URL"))?;
-        let result = client.get(url).send().with_context(|| format!("Failed downloading artwork for {}", legend.name))?
-            .error_for_status().with_context(|| format!("Artwork server returned an error for {}", legend.name))?;
-        let bytes = result.bytes().with_context(|| format!("Could not read artwork bytes for {}", legend.name))?;
+        let url = variant
+            .image_url
+            .as_deref()
+            .ok_or_else(|| anyhow!("Matched variant has no image URL"))?;
 
-        if bytes.is_empty()
-        {
+        let response = client
+            .get(url)
+            .send()
+            .with_context(|| format!("Failed downloading artwork for {}", legend.name))?
+            .error_for_status()
+            .with_context(|| format!("Artwork server returned an error for {}", legend.name))?;
+
+        let bytes = response
+            .bytes()
+            .with_context(|| format!("Could not read artwork bytes for {}", legend.name))?;
+
+        if bytes.is_empty() {
             eprintln!("Warning: empty artwork for {}; skipping.", legend.name);
+            unmatched += 1;
             continue;
         }
 
+        // Write to a temporary file first, then replace the target.
         let tmp = target.with_extension("download.tmp");
+
         fs::write(&tmp, &bytes).with_context(|| format!("Could not write {}", tmp.display()))?;
-        fs::rename(&tmp, &target).with_context(|| format!("Could not cache artwork at {}", target.display()))?;
+
+        fs::rename(&tmp, &target)
+            .with_context(|| format!("Could not cache artwork at {}", target.display()))?;
+
         downloaded += 1;
 
-        println!("Downloaded {} -> {}", legend.name, target.display());
+        println!(
+            "Downloaded {} -> {}",
+            legend.name,
+            target.display()
+        );
 
-        // Avoid making a rapid series of requests to the image host; the cache prevents repeat downloads.
-        std::thread::sleep(Duration::from_millis(120));
+        // Avoid sending rapid successive image requests.
+        std::thread::sleep(Duration::from_millis(DOWNLOAD_DELAY_MS));
     }
 
-    println!("Artwork sync complete: {downloaded} image(s) downloaded.");
+    println!("Artwork sync complete: {downloaded} image(s) downloaded");
+    println!("{unmatched} unmatched or empty image(s).\n");
 
     Ok(())
 }
-
