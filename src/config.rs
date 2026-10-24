@@ -9,8 +9,6 @@ pub const MARGIN_X: f32 = 90.0;
 pub const GRID_TOP: f32 = 235.0;
 pub const GRID_BOTTOM: f32 = 1010.0;
 pub const GAP: f32 = 14.0;
-pub const MIN_TILE_WIDTH: f32 = 220.0;
-pub const MAX_TILE_WIDTH: f32 = 600.0;
 pub const BORDER_RADIUS: f32 = 18.0;
 pub const BORDER_WIDTH: f32 = 3.0;
 

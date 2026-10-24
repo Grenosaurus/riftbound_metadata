@@ -30,7 +30,7 @@ struct Args {
     output: PathBuf,
     #[arg(long)]
     svg: Option<PathBuf>,
-    #[arg(long, default_value = "assets/legends")]
+    #[arg(long, default_value = "../DataFiles/RiftboundAssets/legends")]
     assets: PathBuf,
     /// Do not contact Piltover Archive; render using cached/local artwork only.
     #[arg(long)]
@@ -51,7 +51,12 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let tournament: TournamentFile = load_json(&args.tournament)?;
     let legend_db: HashMap<String, Legend> = load_json(&args.legends)?;
-    let tournament_keys: Vec<String> = tournament.legends.keys().cloned().collect();
+    let tournament_keys: Vec<String> = tournament
+        .legends
+        .iter()
+        .filter(|(_, count)| **count > 0)
+        .map(|(key, _)| key.clone())
+        .collect();
 
     if !args.skip_artwork {
         if let Err(err) = artwork::sync_artwork(
@@ -71,6 +76,10 @@ fn main() -> Result<()> {
     let mut legends = Vec::new();
 
     for (key, count) in &tournament.legends {
+        if *count == 0 {
+            continue;
+        }
+
         if !legend_db.contains_key(key) {
             eprintln!("Warning: '{}' is missing from legends.json; skipping.", key);
             continue;

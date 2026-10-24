@@ -1,6 +1,6 @@
 # Riftbound Meta Generator (Rust) — Piltover Archive artwork sync
 
-This program generates a 1920×1080 PNG and matching SVG from local tournament data. Before rendering, it can download missing Legend artwork from Piltover Archive and cache the files in `assets/legends/`.
+This program generates a 1920×1080 PNG and matching SVG from local tournament data. Before rendering, it can download missing Legend artwork from Piltover Archive and cache the original, uncropped files in `assets/legends/`. For display, the renderer trims the top and side borders and the lower text area. Square Legend tiles are arranged in a grid sized to use the available canvas; entries are ordered by tournament count, and the count is shown on each tile.
 
 ## Requirements
 
@@ -38,11 +38,15 @@ cargo run -- --assets assets/legends
 
 ## How artwork sync works
 
-1. The app reads the tournament's Legend keys.
+1. The app reads the tournament's Legend keys and only considers entries with a count greater than zero for artwork downloads.
 2. It requests pages from `https://piltoverarchive.com/api/external/v1/cards`, filtering for Legend cards and artwork.
 3. It matches the returned card name to the full local name (`name` + `title`). If the local image filename ends with a set suffix such as `_ogn`, `_ven`, `_sfd`, `_rad`, `_unl`, or `_ogs`, it prefers a printing from that set.
-4. It downloads the chosen `imageUrl` to the filename already defined in `data/legends.json`.
+4. It downloads the chosen `imageUrl` unchanged to the filename already defined in `data/legends.json`.
 5. Cached images are reused on later runs. `--refresh-artwork` forces re-downloads.
+
+The display crop is applied only when generating the SVG/PNG; the cached artwork remains the full downloaded image. If your cache contains previously cropped artwork, run with `--refresh-artwork` once to replace it with the full images.
+
+Legends are ordered from highest to lowest tournament count. Legends with the same count are kept together in a row whenever they fit at a reasonable tile size, so a tied Legend does not appear below a more popular tier just because the row ran out of space.
 
 The API is publicly accessible according to community reverse-engineered documentation, but it is not an officially published/stable API and may change. The program uses no API key. Requests are paginated (limit 100), the API response is cached indirectly through local image files, and a small delay is used between image downloads. Check Piltover Archive's terms and Riot Games' applicable policies before redistributing card art.
 

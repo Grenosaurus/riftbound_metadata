@@ -265,11 +265,7 @@ pub fn sync_artwork(
 
         downloaded += 1;
 
-        println!(
-            "Downloaded {} -> {}",
-            legend.name,
-            target.display()
-        );
+        println!("Downloaded {} -> {}", legend.name, target.display());
 
         // Avoid sending rapid successive image requests.
         std::thread::sleep(Duration::from_millis(DOWNLOAD_DELAY_MS));

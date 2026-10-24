@@ -63,13 +63,30 @@ pub fn render_svg(
     s.push_str(&format!(r##"<text x="90" y="72" fill="{}" font-family="Arial,sans-serif" font-size="30" font-weight="700" letter-spacing="4">RIFTBOUND</text>"##,
                         ACCENT));
 
+    if let Some(date) = t
+        .date
+        .as_deref()
+        .map(str::trim)
+        .filter(|date| !date.is_empty())
+    {
+        s.push_str(&format!(
+            r##"<text x="1830" y="72" text-anchor="end" fill="{}" font-family="Arial,sans-serif" font-size="18">{}</text>"##,
+            MUTED_TEXT,
+            esc(date)
+        ));
+    }
+
     s.push_str(&format!(r##"<text x="90" y="126" fill="{}" font-family="Arial,sans-serif" font-size="48" font-weight="800">LEGEND META BREAKDOWN</text>"##,
                         TEXT));
 
-    // Show the tournament name only; omit the date and player count.
+    let tournament_label = if t.players == 1 {
+        format!("{} (1 player)", t.name)
+    } else {
+        format!("{} ({} players)", t.name, t.players)
+    };
     s.push_str(&format!(r##"<text x="90" y="165" fill="{}" font-family="Arial,sans-serif" font-size="22">{}</text><line x1="90" y1="195" x2="1830" y2="195" stroke="{}" stroke-opacity="0.45" stroke-width="2"/>"##,
                         MUTED_TEXT,
-                        esc(&t.name),
+                        esc(&tournament_label),
                         ACCENT));
 
     for tile in tiles {
@@ -106,20 +123,12 @@ pub fn render_svg(
                                 image = image));
         }
 
-        let bh = 36.0_f32.min(h * 0.15);
+        let bh = 30.0_f32.min(h * 0.12);
         let by = y + 12.0;
-        let pw = 70.0_f32.min(w * 0.32);
-        let px = x + 12.0;
         let bw = 54.0_f32.min(w * 0.25);
-        let bx = x + w - bw - 12.0;
+        let bx = x + 12.0;
 
-        s.push_str(&format!(r##"<rect x="{px:.1}" y="{by:.1}" width="{pw:.1}" height="{bh:.1}" rx="9" fill="#000000" fill-opacity="0.62"/><text x="{pcx:.1}" y="{cy:.1}" text-anchor="middle" fill="{accent}" font-family="Arial,sans-serif" font-size="{pfs:.1}" font-weight="700">{pct:.1}%</text><rect x="{bx:.1}" y="{by:.1}" width="{bw:.1}" height="{bh:.1}" rx="9" fill="#000000" fill-opacity="0.62"/><text x="{cx:.1}" y="{cy:.1}" text-anchor="middle" fill="{text}" font-family="Arial,sans-serif" font-size="{fs:.1}" font-weight="700">{count}</text>"##,
-                            px = px,
-                            pw = pw,
-                            pcx = px + pw / 2.0,
-                            pfs = (bh * 0.42).clamp(11.0, 15.0),
-                            accent = ACCENT,
-                            pct = tile.percentage,
+        s.push_str(&format!(r##"<rect x="{bx:.1}" y="{by:.1}" width="{bw:.1}" height="{bh:.1}" rx="9" fill="#000000" fill-opacity="0.62"/><text x="{cx:.1}" y="{cy:.1}" text-anchor="middle" fill="{text}" font-family="Arial,sans-serif" font-size="{fs:.1}" font-weight="700">{count}</text>"##,
                             bx = bx,
                             by = by,
                             bw = bw,
@@ -127,7 +136,7 @@ pub fn render_svg(
                             cx = bx + bw / 2.0,
                             cy = by + bh * 0.70,
                             text = TEXT,
-                            fs = (bh * 0.52).clamp(13.0, 18.0),
+                            fs = (bh * 0.58).clamp(12.0, 16.0),
                             count = tile.count));
 
         let ts = (w / 16.0).clamp(14.0, 25.0);
