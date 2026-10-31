@@ -4,8 +4,7 @@ mod layout;
 mod models;
 mod renderer;
 
-use crate::layout::build_layout;
-use crate::layout::LegendCount;
+use crate::layout::{build_layout, LegendCount};
 use crate::models::{Legend, TournamentFile};
 use crate::renderer::render_svg;
 use anyhow::{Context, Result};
@@ -34,10 +33,15 @@ struct Args {
     #[arg(long, default_value = "../DataFiles/RiftboundAssets/legends")]
     assets: PathBuf,
     /// Do not contact Piltover Archive; render using cached/local artwork only.
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Do not contact Piltover Archive; render using cached/local artwork only."
+    )]
     skip_artwork: bool,
-    /// Re-download artwork even when a cached file already exists.
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Re-download artwork even when a cached file already exists."
+    )]
     refresh_artwork: bool,
 }
 

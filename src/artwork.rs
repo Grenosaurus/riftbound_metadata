@@ -1,7 +1,3 @@
-//! Downloads Legend artwork from Piltover Archive and caches it locally.
-//! The Archive's external API is community-documented/observed,
-//! not an official stable contract.
-
 use crate::models::Legend;
 use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
@@ -45,8 +41,6 @@ struct ApiCard {
     name: Option<String>,
 }
 
-/// Normalize names so punctuation, spaces, and capitalization
-/// do not prevent a match.
 fn normalize(s: &str) -> String {
     s.chars()
         .filter(|c| c.is_alphanumeric())
@@ -54,9 +48,6 @@ fn normalize(s: &str) -> String {
         .collect()
 }
 
-/// Extract the preferred set code from the local image filename.
-///
-/// Example: "ahri_ogn.png" -> Some("OGN")
 fn preferred_set(image_name: &str) -> Option<&'static str> {
     let stem = Path::new(image_name).file_stem()?.to_str()?;
     let suffix = stem.rsplit('_').next()?.to_ascii_lowercase();
@@ -72,7 +63,6 @@ fn preferred_set(image_name: &str) -> Option<&'static str> {
     }
 }
 
-/// Fetch all Legend Rare artwork variants from the Archive API.
 fn fetch_all_variants(client: &Client) -> Result<Vec<ApiVariant>> {
     let mut all = Vec::new();
     let mut page = 1_u32;
@@ -128,7 +118,39 @@ fn fetch_all_variants(client: &Client) -> Result<Vec<ApiVariant>> {
     Ok(all)
 }
 
-/// Select the best matching card variant for a Legend.
+fn has_http_image(variant: &ApiVariant) -> bool {
+    variant
+        .image_url
+        .as_deref()
+        .is_some_and(|url| url.starts_with("https://") || url.starts_with("http://"))
+}
+
+fn matches_legend_name(variant: &ApiVariant, full_name: &str, name: &str) -> bool {
+    variant
+        .card
+        .as_ref()
+        .and_then(|card| card.name.as_deref())
+        .map(normalize)
+        .is_some_and(|variant_name| variant_name == full_name || variant_name == name)
+}
+
+fn is_preferred_set(variant: &ApiVariant, set: &str) -> bool {
+    variant
+        .variant_number
+        .as_deref()
+        .is_some_and(|number| number.to_ascii_uppercase().starts_with(set))
+}
+
+fn is_special_variant(variant: &ApiVariant) -> bool {
+    variant
+        .variant_number
+        .as_deref()
+        .map(str::to_ascii_uppercase)
+        .is_some_and(|number| {
+            number.contains("FOIL") || number.contains("NEXUS") || number.contains("SHOWCASE")
+        })
+}
+
 fn choose_variant<'a>(variants: &'a [ApiVariant], legend: &Legend) -> Option<&'a ApiVariant> {
     let full_name = format!("{}, {}", legend.name, legend.title);
     let full_normalized = normalize(&full_name);
@@ -137,58 +159,26 @@ fn choose_variant<'a>(variants: &'a [ApiVariant], legend: &Legend) -> Option<&'a
     let mut matches: Vec<&ApiVariant> = variants
         .iter()
         .filter(|variant| {
-            let name_matches = variant
-                .card
-                .as_ref()
-                .and_then(|card| card.name.as_deref())
-                .map(normalize)
-                .map(|name| name == full_normalized || name == name_normalized)
-                .unwrap_or(false);
-
-            let has_http_image = variant
-                .image_url
-                .as_deref()
-                .map(|url| url.starts_with("https://") || url.starts_with("http://"))
-                .unwrap_or(false);
-
-            name_matches && has_http_image
+            has_http_image(variant)
+                && matches_legend_name(variant, &full_normalized, &name_normalized)
         })
         .collect();
 
-    // Prefer the set code encoded in legends.json, if available.
     if let Some(set) = preferred_set(&legend.image) {
-        if let Some(found) = matches.iter().copied().find(|variant| {
-            variant
-                .variant_number
-                .as_deref()
-                .map(|number| number.to_ascii_uppercase().starts_with(set))
-                .unwrap_or(false)
-        }) {
+        if let Some(found) = matches
+            .iter()
+            .copied()
+            .find(|variant| is_preferred_set(variant, set))
+        {
             return Some(found);
         }
     }
 
-    // Prefer standard variants over foil, Nexus, or Showcase variants.
-    matches.sort_by_key(|variant| {
-        let number = variant
-            .variant_number
-            .as_deref()
-            .unwrap_or("")
-            .to_ascii_uppercase();
-
-        if number.contains("FOIL") || number.contains("NEXUS") || number.contains("SHOWCASE") {
-            1
-        } else {
-            0
-        }
-    });
+    matches.sort_by_key(|variant| is_special_variant(variant));
 
     matches.into_iter().next()
 }
 
-/// Download missing artwork for Legends used in the tournament.
-///
-/// If `refresh` is true, download the artwork again even if cached files exist.
 pub fn sync_artwork(
     legend_db: &HashMap<String, Legend>,
     tournament_keys: &[String],
@@ -255,7 +245,6 @@ pub fn sync_artwork(
             continue;
         }
 
-        // Write to a temporary file first, then replace the target.
         let tmp = target.with_extension("download.tmp");
 
         fs::write(&tmp, &bytes).with_context(|| format!("Could not write {}", tmp.display()))?;
@@ -267,7 +256,6 @@ pub fn sync_artwork(
 
         println!("Downloaded {} -> {}", legend.name, target.display());
 
-        // Avoid sending rapid successive image requests.
         std::thread::sleep(Duration::from_millis(DOWNLOAD_DELAY_MS));
     }
 
