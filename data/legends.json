@@ -39,7 +39,7 @@
     "name": "Diana",
     "title": "Scorn of the Moon",
     "image": "diana_unl.png",
-    "faction": "Mount Targon"
+    "faction": "Targon"
   },
   "draven_sfd": {
     "name": "Draven",
@@ -123,7 +123,7 @@
     "name": "Kai'Sa",
     "title": "Daughter of the Void",
     "image": "kaisa_ogn.png",
-    "faction": "The Void"
+    "faction": "Void"
   },
   "kennen_ven": {
     "name": "Kennen",
@@ -135,7 +135,7 @@
     "name": "Kha'Zix",
     "title": "Voidreaver",
     "image": "khazix_unl.png",
-    "faction": "The Void"
+    "faction": "Void"
   },
   "ksante_rad": {
     "name": "K'Sante",
@@ -159,7 +159,7 @@
     "name": "Leona",
     "title": "Radiant Dawn",
     "image": "leona_ogn.png",
-    "faction": "Mount Targon"
+    "faction": "Targon"
   },
   "lillia_unl": {
     "name": "Lillia",
@@ -243,7 +243,7 @@
     "name": "Rek'Sai",
     "title": "Void Burrower",
     "image": "reksai_sfd.png",
-    "faction": "The Void"
+    "faction": "Void"
   },
   "renataglasc_sfd": {
     "name": "Renata Glasc",

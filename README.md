@@ -95,7 +95,9 @@ It also contains a `legends` object mapping Legend IDs to tournament counts. Cou
 
 `data/legends.json` maps those IDs to Legend metadata: `name`, `title`, `image`,
 and `faction`. Counts are supplied in the tournament file; they are not fetched
-from Piltover Archive.
+from Piltover Archive. Faction names must exactly match the configured names
+(for example, use `Void`, not `The Void`); unrecognized names use the default
+accent color.
 
 Example tournament file:
 

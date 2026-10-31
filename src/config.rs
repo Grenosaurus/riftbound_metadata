@@ -14,20 +14,21 @@ pub const BORDER_WIDTH: f32 = 3.0;
 
 pub fn faction_color(faction: &str) -> &'static str {
     match faction {
+        "Bandle City" => "#0ff2eb",
+        "Buhru" => "#f2e50f",
+        "Bilgewater" => "#dc0aef",
+        "Demacia" => "#8BAFD1",
+        "Freljord" => "#77AFC6",
         "Ionia" => "#39e911",
+        "Iztal" => "#ef2610",
         "Noxus" => "#C84B55",
         "Piltover" => "#D8A84E",
-        "Demacia" => "#8BAFD1",
         "Shadow Isles" => "#657A91",
         "Shurima" => "#D18A45",
-        "Freljord" => "#77AFC6",
-        "Mount Targon" => "#0f3a65",
+        "Targon" => "#0f3a65",
+        "Void" => "#8C79C8",
         "Zaun" => "#45371d",
         "Demon" => "#211253",
-        "Bilgewater" => "#dc0aef",
-        "The Void" => "#8C79C8",
-        "Iztal" => "#ef2610",
-        "Bandle City" => "#0ff2eb",
         _ => ACCENT,
     }
 }
