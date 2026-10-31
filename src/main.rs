@@ -22,7 +22,7 @@ use std::{
     about = "Generate a Riftbound Legend meta breakdown PNG."
 )]
 struct Args {
-    #[arg(default_value = "data/tournament.json")]
+    #[arg(default_value = "../DataFiles/RiftboundTournaments/tournament.json")]
     tournament: PathBuf,
     #[arg(long, default_value = "data/legends.json")]
     legends: PathBuf,

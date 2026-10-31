@@ -39,7 +39,9 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 ```
 
-By default, the program reads `data/tournament.json` and `data/legends.json`, then writes:
+By default, the program reads
+`../DataFiles/RiftboundTournaments/tournament.json` and
+`data/legends.json`, then writes:
 
 - PNG: `output/meta.png`
 - SVG: `output/meta.svg`
@@ -52,7 +54,7 @@ Run `cargo run -- --help` to see the CLI help. The available arguments are:
 
 | Argument | Default | Purpose |
 |---|---|---|
-| `tournament` | `data/tournament.json` | Tournament data JSON file (positional argument) |
+| `tournament` | `../DataFiles/RiftboundTournaments/tournament.json` | Tournament data JSON file (positional argument) |
 | `--legends` | `data/legends.json` | Legend metadata JSON file |
 | `--output` | `output/meta.png` | PNG output path |
 | `--svg` | Same path as `--output` with `.svg` extension | Optional SVG output path |
@@ -64,7 +66,7 @@ Examples:
 
 ```powershell
 # Choose the tournament and metadata files
-cargo run -- data/tournament.json --legends data/legends.json
+cargo run -- ..\DataFiles\RiftboundTournaments\tournament.json --legends data/legends.json
 
 # Choose output paths
 cargo run -- --output output/my_meta.png --svg output/my_meta.svg
@@ -81,7 +83,8 @@ cargo run -- --assets assets/legends
 
 ## Input data
 
-`data/tournament.json` contains a `tournament` object with:
+`../DataFiles/RiftboundTournaments/tournament.json` contains a `tournament`
+object with:
 
 - `name`: tournament name
 - `date`: optional date string; an empty string omits the date from the output
@@ -89,7 +92,9 @@ cargo run -- --assets assets/legends
 
 It also contains a `legends` object mapping Legend IDs to tournament counts. Counts of zero are excluded from both the rendered output and artwork synchronization.
 
-`data/legends.json` maps those IDs to Legend metadata: `name`, `title`, `image`, and `faction`. Counts are supplied in the tournament file; they are not fetched from Piltover Archive.
+`data/legends.json` maps those IDs to Legend metadata: `name`, `title`, `image`,
+and `faction`. Counts are supplied in the tournament file; they are not fetched
+from Piltover Archive.
 
 Example tournament file:
 
@@ -165,12 +170,14 @@ riftbound_metadata/
 │       ├── layout.rs
 │       └── renderer.rs
 ├── data/
-│   ├── tournament.json
 │   └── legends.json
 └── output/                 # Generated output; created when the program runs
 ```
 
-The artwork cache is outside the project by default (`../DataFiles/RiftboundAssets/legends`) and can be changed with `--assets`.
+The tournament input and artwork cache are outside the project by default:
+`../DataFiles/RiftboundTournaments/tournament.json` and
+`../DataFiles/RiftboundAssets/legends`. Both locations can be overridden with
+the positional tournament argument and `--assets`, respectively.
 
 ## Program architecture
 

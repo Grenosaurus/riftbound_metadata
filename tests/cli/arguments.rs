@@ -19,4 +19,5 @@ fn help_lists_cli_options_without_needing_input_files() {
     ] {
         assert!(help.contains(option), "help is missing {option}");
     }
+    assert!(help.contains("../DataFiles/RiftboundTournaments/tournament.json"));
 }

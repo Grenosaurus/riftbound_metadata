@@ -86,3 +86,13 @@ fn render_png_rejects_invalid_svg() {
 
     assert!(error.to_string().contains("Could not parse generated SVG"));
 }
+
+#[test]
+fn tournament_argument_defaults_to_datafiles_tournament_path() {
+    let args = Args::try_parse_from(["riftbound_meta"]).unwrap();
+
+    assert_eq!(
+        args.tournament,
+        PathBuf::from("../DataFiles/RiftboundTournaments/tournament.json")
+    );
+}
