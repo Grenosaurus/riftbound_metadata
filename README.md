@@ -39,12 +39,13 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 ```
 
-By default, the program reads
-`../DataFiles/RiftboundTournaments/tournament.json` and
-`data/legends.json`, then writes:
+The program uses fixed data folders and accepts filenames rather than paths.
+By default, it reads `tournament.json` from
+`../DataFiles/RiftboundTournaments` and `data/legends.json` from the project,
+then writes:
 
-- PNG: `output/meta.png`
-- SVG: `output/meta.svg`
+- PNG: `../DataFiles/RiftboundTournaments/TournamentOutput/meta.png`
+- SVG: `../DataFiles/RiftboundTournaments/TournamentOutput/meta.svg`
 
 All relative paths are resolved from the current working directory.
 
@@ -54,36 +55,36 @@ Run `cargo run -- --help` to see the CLI help. The available arguments are:
 
 | Argument | Default | Purpose |
 |---|---|---|
-| `tournament` | `../DataFiles/RiftboundTournaments/tournament.json` | Tournament data JSON file (positional argument) |
-| `--legends` | `data/legends.json` | Legend metadata JSON file |
-| `--output` | `output/meta.png` | PNG output path |
-| `--svg` | Same path as `--output` with `.svg` extension | Optional SVG output path |
-| `--assets` | `../DataFiles/RiftboundAssets/legends` | Artwork cache directory |
+| `tournament` | `tournament.json` | Tournament JSON filename, read from `../DataFiles/RiftboundTournaments` |
+| `--output` | `meta.png` | PNG filename, written to `../DataFiles/RiftboundTournaments/TournamentOutput` |
+| `--svg` | PNG filename with `.svg` extension | Optional SVG filename, written to the same output folder |
 | `--skip-artwork` | Off | Do not contact Piltover Archive; render using local artwork only |
 | `--refresh-artwork` | Off | Re-download artwork for positive-count tournament Legends, even if cached |
+
+Tournament and output arguments must be filenames only; directory paths are
+rejected. The tournament database and artwork cache locations are fixed at
+`data/legends.json` and `../DataFiles/RiftboundAssets/legends`.
 
 Examples:
 
 ```powershell
-# Choose the tournament and metadata files
-cargo run -- ..\DataFiles\RiftboundTournaments\tournament.json --legends data/legends.json
+# Use the default tournament.json and meta.png/meta.svg names
+cargo run
 
-# Choose output paths
-cargo run -- --output output/my_meta.png --svg output/my_meta.svg
+# Use a different tournament filename and output filenames
+cargo run -- weekly-event.json --output weekly-meta.png --svg weekly-meta.svg
 
 # Render offline from the configured artwork cache
 cargo run -- --skip-artwork
 
 # Force artwork downloads for Legends with counts greater than zero
 cargo run -- --refresh-artwork
-
-# Use a different artwork cache
-cargo run -- --assets assets/legends
 ```
 
 ## Input data
 
-`../DataFiles/RiftboundTournaments/tournament.json` contains a `tournament`
+The selected tournament file (by default
+`../DataFiles/RiftboundTournaments/tournament.json`) contains a `tournament`
 object with:
 
 - `name`: tournament name
@@ -171,13 +172,14 @@ riftbound_metadata/
 │       └── renderer.rs
 ├── data/
 │   └── legends.json
-└── output/                 # Generated output; created when the program runs
 ```
 
-The tournament input and artwork cache are outside the project by default:
-`../DataFiles/RiftboundTournaments/tournament.json` and
-`../DataFiles/RiftboundAssets/legends`. Both locations can be overridden with
-the positional tournament argument and `--assets`, respectively.
+Tournament JSON files are read from
+`../DataFiles/RiftboundTournaments`; only the filename is supplied on the
+command line. The artwork cache is at
+`../DataFiles/RiftboundAssets/legends`. Generated PNG and SVG files are written
+to `../DataFiles/RiftboundTournaments/TournamentOutput`; only their filenames
+are supplied on the command line.
 
 ## Program architecture
 

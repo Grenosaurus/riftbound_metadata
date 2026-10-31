@@ -88,11 +88,42 @@ fn render_png_rejects_invalid_svg() {
 }
 
 #[test]
-fn tournament_argument_defaults_to_datafiles_tournament_path() {
+fn tournament_argument_defaults_to_filename_only() {
     let args = Args::try_parse_from(["riftbound_meta"]).unwrap();
 
+    assert_eq!(args.tournament, PathBuf::from("tournament.json"));
+}
+
+#[test]
+fn output_argument_defaults_to_filename_only() {
+    let args = Args::try_parse_from(["riftbound_meta"]).unwrap();
+
+    assert_eq!(args.output, PathBuf::from("meta.png"));
+}
+
+#[test]
+fn resolves_tournament_filename_under_fixed_datafiles_directory() {
     assert_eq!(
-        args.tournament,
-        PathBuf::from("../DataFiles/RiftboundTournaments/tournament.json")
+        resolve_filename(TOURNAMENT_DIR, Path::new("weekly.json"), "Tournament").unwrap(),
+        PathBuf::from("../DataFiles/RiftboundTournaments/weekly.json")
     );
+}
+
+#[test]
+fn resolves_output_filename_under_fixed_output_directory() {
+    assert_eq!(
+        resolve_filename(OUTPUT_DIR, Path::new("weekly.png"), "PNG output").unwrap(),
+        PathBuf::from("../DataFiles/RiftboundTournaments/TournamentOutput/weekly.png")
+    );
+}
+
+#[test]
+fn rejects_filename_arguments_that_include_directories() {
+    for path in [
+        Path::new("nested/file.json"),
+        Path::new("../file.json"),
+        Path::new("C:\\files\\file.json"),
+    ] {
+        assert!(resolve_filename(TOURNAMENT_DIR, path, "Tournament").is_err());
+    }
 }

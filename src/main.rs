@@ -7,13 +7,18 @@ mod renderer;
 use crate::layout::{build_layout, LegendCount};
 use crate::models::{Legend, TournamentFile};
 use crate::renderer::render_svg;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
+
+const TOURNAMENT_DIR: &str = "../DataFiles/RiftboundTournaments";
+const OUTPUT_DIR: &str = "../DataFiles/RiftboundTournaments/TournamentOutput";
+const LEGENDS_FILE: &str = "data/legends.json";
+const ASSETS_DIR: &str = "../DataFiles/RiftboundAssets/legends";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -22,16 +27,22 @@ use std::{
     about = "Generate a Riftbound Legend meta breakdown PNG."
 )]
 struct Args {
-    #[arg(default_value = "../DataFiles/RiftboundTournaments/tournament.json")]
+    #[arg(
+        default_value = "tournament.json",
+        help = "Tournament JSON filename in ../DataFiles/RiftboundTournaments."
+    )]
     tournament: PathBuf,
-    #[arg(long, default_value = "data/legends.json")]
-    legends: PathBuf,
-    #[arg(long, default_value = "output/meta.png")]
+    #[arg(
+        long,
+        default_value = "meta.png",
+        help = "PNG output filename in ../DataFiles/RiftboundTournaments/TournamentOutput."
+    )]
     output: PathBuf,
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "SVG output filename. Defaults to the PNG filename with .svg."
+    )]
     svg: Option<PathBuf>,
-    #[arg(long, default_value = "../DataFiles/RiftboundAssets/legends")]
-    assets: PathBuf,
     /// Do not contact Piltover Archive; render using cached/local artwork only.
     #[arg(
         long,
@@ -57,12 +68,38 @@ fn main() -> Result<()> {
 }
 
 fn run(args: Args) -> Result<()> {
-    let tournament: TournamentFile = load_json(&args.tournament)?;
-    let legend_db: HashMap<String, Legend> = load_json(&args.legends)?;
+    let tournament_path = resolve_filename(TOURNAMENT_DIR, &args.tournament, "Tournament")?;
+    let output_path = resolve_filename(OUTPUT_DIR, &args.output, "PNG output")?;
+    let svg_path = match &args.svg {
+        Some(path) => resolve_filename(OUTPUT_DIR, path, "SVG output")?,
+        None => output_path.with_extension("svg"),
+    };
+    let assets_dir = Path::new(ASSETS_DIR);
 
-    sync_artwork_if_enabled(&args, &tournament, &legend_db);
+    let tournament: TournamentFile = load_json(&tournament_path)?;
+    let legend_db: HashMap<String, Legend> = load_json(Path::new(LEGENDS_FILE))?;
+
+    sync_artwork_if_enabled(&args, &tournament, &legend_db, assets_dir);
     let legends = prepare_legends(&tournament, &legend_db);
-    write_outputs(&args, &tournament, &legend_db, &legends)
+    write_outputs(
+        &tournament,
+        &legend_db,
+        &legends,
+        assets_dir,
+        &output_path,
+        &svg_path,
+    )
+}
+
+fn resolve_filename(directory: &str, filename: &Path, label: &str) -> Result<PathBuf> {
+    let mut components = filename.components();
+    if !matches!(components.next(), Some(std::path::Component::Normal(_)))
+        || components.next().is_some()
+    {
+        bail!("{label} must be a filename only; directory paths are not accepted");
+    }
+
+    Ok(Path::new(directory).join(filename))
 }
 
 fn prepare_legends(
@@ -95,6 +132,7 @@ fn sync_artwork_if_enabled(
     args: &Args,
     tournament: &TournamentFile,
     legend_db: &HashMap<String, Legend>,
+    assets_dir: &Path,
 ) {
     if args.skip_artwork {
         return;
@@ -110,40 +148,36 @@ fn sync_artwork_if_enabled(
     if let Err(err) = artwork::sync_artwork(
         legend_db,
         &tournament_keys,
-        &args.assets,
+        assets_dir,
         args.refresh_artwork,
     ) {
         eprintln!("Warning: artwork sync failed: {err:#}");
         eprintln!(
             "Continuing with any artwork already cached in {}.",
-            args.assets.display()
+            assets_dir.display()
         );
     }
 }
 
 fn write_outputs(
-    args: &Args,
     tournament: &TournamentFile,
     legend_db: &HashMap<String, Legend>,
     legends: &[LegendCount],
+    assets_dir: &Path,
+    output_path: &Path,
+    svg_path: &Path,
 ) -> Result<()> {
     let tiles = build_layout(legends);
-    let svg = render_svg(&tournament.tournament, legend_db, &tiles, &args.assets)?;
+    let svg = render_svg(&tournament.tournament, legend_db, &tiles, assets_dir)?;
 
-    let svg_path = args
-        .svg
-        .clone()
-        .unwrap_or_else(|| args.output.with_extension("svg"));
+    ensure_parent_dir(output_path)?;
+    ensure_parent_dir(svg_path)?;
 
-    ensure_parent_dir(&args.output)?;
-    ensure_parent_dir(&svg_path)?;
+    fs::write(svg_path, &svg).with_context(|| format!("Could not write {}", svg_path.display()))?;
 
-    fs::write(&svg_path, &svg)
-        .with_context(|| format!("Could not write {}", svg_path.display()))?;
+    render_png(&svg, output_path)?;
 
-    render_png(&svg, &args.output)?;
-
-    println!("Generated: {}", args.output.display());
+    println!("Generated: {}", output_path.display());
     println!("SVG:       {}", svg_path.display());
 
     Ok(())

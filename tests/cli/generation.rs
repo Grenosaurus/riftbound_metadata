@@ -1,4 +1,7 @@
-use crate::common::{run_cli, run_cli_with_derived_svg, write_inputs, TestDir};
+use crate::common::{
+    assets_path, output_path, run_cli, run_cli_with_derived_svg, write_inputs, write_inputs_named,
+    TestDir,
+};
 use image::GenericImageView;
 use std::fs;
 
@@ -34,27 +37,27 @@ fn generates_svg_and_png_from_tournament_data() {
             }
         }"#,
     );
-    let assets = dir.path().join("assets");
+    let assets = assets_path(dir.path());
     fs::create_dir_all(&assets).expect("create assets directory");
     image::RgbaImage::from_pixel(100, 100, image::Rgba([20, 40, 60, 255]))
         .save(assets.join("ahri.png"))
         .expect("write artwork fixture");
 
-    let output_path = dir.path().join("nested/output/meta.png");
-    let svg_path = dir.path().join("nested/output/meta.svg");
-    let result = run_cli(&tournament, &legends, &output_path, &svg_path, &assets);
+    let output_file = output_path(dir.path(), "meta.png");
+    let svg_file = output_path(dir.path(), "meta.svg");
+    let result = run_cli(&tournament, &legends, &output_file, &svg_file, &assets);
 
     assert!(
         result.status.success(),
         "CLI failed:\n{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    let png = fs::read(&output_path).expect("read generated PNG");
+    let png = fs::read(&output_file).expect("read generated PNG");
     assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
     let decoded_png = image::load_from_memory(&png).expect("decode generated PNG");
     assert_eq!(decoded_png.dimensions(), (1920, 1080));
 
-    let svg = fs::read_to_string(&svg_path).expect("read generated SVG");
+    let svg = fs::read_to_string(&svg_file).expect("read generated SVG");
     assert!(svg.contains("Cup &amp; &lt;Final&gt; (16 players)"));
     assert!(svg.contains("2026-10-31"));
     assert!(svg.contains("AHRI &amp; FRIENDS"));
@@ -85,13 +88,13 @@ fn missing_artwork_still_generates_output() {
             }
         }"#,
     );
-    let output_path = dir.path().join("meta.png");
-    let svg_path = dir.path().join("meta.svg");
+    let output_file = output_path(dir.path(), "meta.png");
+    let svg_file = output_path(dir.path(), "meta.svg");
     let result = run_cli(
         &tournament,
         &legends,
-        &output_path,
-        &svg_path,
+        &output_file,
+        &svg_file,
         &dir.path().join("empty-assets"),
     );
 
@@ -100,11 +103,11 @@ fn missing_artwork_still_generates_output() {
         "CLI failed:\n{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    let svg = fs::read_to_string(svg_path).expect("read generated SVG");
+    let svg = fs::read_to_string(svg_file).expect("read generated SVG");
     assert!(svg.contains("Offline event (0 players)"));
     assert!(svg.contains("AHRI"));
     assert!(!svg.contains("data:image/png;base64,"));
-    assert!(output_path.exists());
+    assert!(output_file.exists());
 }
 
 #[test]
@@ -122,13 +125,13 @@ fn legends_are_sorted_by_count_then_key() {
             "zulu": {"name":"Zulu","title":"Z","image":"z.png","faction":"Demacia"}
         }"#,
     );
-    let output_path = dir.path().join("meta.png");
-    let svg_path = dir.path().join("meta.svg");
+    let output_file = output_path(dir.path(), "meta.png");
+    let svg_file = output_path(dir.path(), "meta.svg");
     let result = run_cli(
         &tournament,
         &legends,
-        &output_path,
-        &svg_path,
+        &output_file,
+        &svg_file,
         &dir.path().join("assets"),
     );
 
@@ -137,7 +140,7 @@ fn legends_are_sorted_by_count_then_key() {
         "CLI failed:\n{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    let svg = fs::read_to_string(svg_path).expect("read SVG");
+    let svg = fs::read_to_string(svg_file).expect("read SVG");
     let alpha = svg.find(">ALPHA</text>").unwrap();
     let beta = svg.find(">BETA</text>").unwrap();
     let zulu = svg.find(">ZULU</text>").unwrap();
@@ -157,21 +160,21 @@ fn zero_legends_still_produces_a_valid_empty_breakdown() {
             "zero": {"name":"Zero","title":"Unused","image":"zero.png","faction":"Ionia"}
         }"#,
     );
-    let output_path = dir.path().join("meta.png");
-    let svg_path = dir.path().join("meta.svg");
+    let output_file = output_path(dir.path(), "meta.png");
+    let svg_file = output_path(dir.path(), "meta.svg");
     let result = run_cli(
         &tournament,
         &legends,
-        &output_path,
-        &svg_path,
+        &output_file,
+        &svg_file,
         &dir.path().join("assets"),
     );
 
     assert!(result.status.success());
-    let svg = fs::read_to_string(svg_path).expect("read SVG");
+    let svg = fs::read_to_string(svg_file).expect("read SVG");
     assert!(svg.contains("No entries (0 players)"));
     assert!(!svg.contains(">ZERO</text>"));
-    assert!(output_path.exists());
+    assert!(output_file.exists());
 }
 
 #[test]
@@ -182,12 +185,12 @@ fn svg_path_defaults_to_the_png_path_with_svg_extension() {
         r#"{"tournament":{"name":"Derived path"},"legends":{}}"#,
         "{}",
     );
-    let output_path = dir.path().join("nested/result.png");
-    let svg_path = output_path.with_extension("svg");
+    let output_file = output_path(dir.path(), "result.png");
+    let svg_file = output_file.with_extension("svg");
     let result = run_cli_with_derived_svg(
         &tournament,
         &legends,
-        &output_path,
+        &output_file,
         &dir.path().join("assets"),
     );
 
@@ -196,6 +199,37 @@ fn svg_path_defaults_to_the_png_path_with_svg_extension() {
         "CLI failed:\n{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    assert!(output_path.is_file());
-    assert!(svg_path.is_file());
+    assert!(output_file.is_file());
+    assert!(svg_file.is_file());
+}
+
+#[test]
+fn custom_tournament_and_output_filenames_stay_in_their_default_folders() {
+    let dir = TestDir::new();
+    let (tournament, legends) = write_inputs_named(
+        dir.path(),
+        "weekly-event.json",
+        r#"{"tournament":{"name":"Weekly Event"},"legends":{}}"#,
+        "{}",
+    );
+    let output_file = output_path(dir.path(), "weekly-meta.png");
+    let svg_file = output_path(dir.path(), "event-breakdown.svg");
+    let result = run_cli(
+        &tournament,
+        &legends,
+        &output_file,
+        &svg_file,
+        &assets_path(dir.path()),
+    );
+
+    assert!(
+        result.status.success(),
+        "CLI failed:\n{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(output_file.is_file());
+    assert!(svg_file.is_file());
+    assert!(fs::read_to_string(svg_file)
+        .unwrap()
+        .contains("Weekly Event (0 players)"));
 }
