@@ -58,3 +58,7 @@ pub fn build_layout(legends: &[LegendCount]) -> Vec<Tile> {
 
     tiles
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/layout.rs"]
+mod tests;

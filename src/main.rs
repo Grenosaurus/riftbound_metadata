@@ -5,6 +5,7 @@ mod models;
 mod renderer;
 
 use crate::layout::build_layout;
+use crate::layout::LegendCount;
 use crate::models::{Legend, TournamentFile};
 use crate::renderer::render_svg;
 use anyhow::{Context, Result};
@@ -48,32 +49,23 @@ fn load_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
 }
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    run(Args::parse())
+}
+
+fn run(args: Args) -> Result<()> {
     let tournament: TournamentFile = load_json(&args.tournament)?;
     let legend_db: HashMap<String, Legend> = load_json(&args.legends)?;
-    let tournament_keys: Vec<String> = tournament
-        .legends
-        .iter()
-        .filter(|(_, count)| **count > 0)
-        .map(|(key, _)| key.clone())
-        .collect();
 
-    if !args.skip_artwork {
-        if let Err(err) = artwork::sync_artwork(
-            &legend_db,
-            &tournament_keys,
-            &args.assets,
-            args.refresh_artwork,
-        ) {
-            eprintln!("Warning: artwork sync failed: {err:#}");
-            eprintln!(
-                "Continuing with any artwork already cached in {}.",
-                args.assets.display()
-            );
-        }
-    }
+    sync_artwork_if_enabled(&args, &tournament, &legend_db);
+    let legends = prepare_legends(&tournament, &legend_db);
+    write_outputs(&args, &tournament, &legend_db, &legends)
+}
 
-    let mut legends = Vec::new();
+fn prepare_legends(
+    tournament: &TournamentFile,
+    legend_db: &HashMap<String, Legend>,
+) -> Vec<LegendCount> {
+    let mut legends = Vec::with_capacity(tournament.legends.len());
 
     for (key, count) in &tournament.legends {
         if *count == 0 {
@@ -92,27 +84,82 @@ fn main() -> Result<()> {
     }
 
     legends.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.key.cmp(&b.key)));
+    legends
+}
 
-    let tiles = build_layout(&legends);
-    let svg = render_svg(&tournament.tournament, &legend_db, &tiles, &args.assets)?;
-
-    if let Some(parent) = args.output.parent() {
-        fs::create_dir_all(parent)?;
+fn sync_artwork_if_enabled(
+    args: &Args,
+    tournament: &TournamentFile,
+    legend_db: &HashMap<String, Legend>,
+) {
+    if args.skip_artwork {
+        return;
     }
+
+    let tournament_keys: Vec<String> = tournament
+        .legends
+        .iter()
+        .filter(|(_, count)| **count > 0)
+        .map(|(key, _)| key.clone())
+        .collect();
+
+    if let Err(err) = artwork::sync_artwork(
+        legend_db,
+        &tournament_keys,
+        &args.assets,
+        args.refresh_artwork,
+    ) {
+        eprintln!("Warning: artwork sync failed: {err:#}");
+        eprintln!(
+            "Continuing with any artwork already cached in {}.",
+            args.assets.display()
+        );
+    }
+}
+
+fn write_outputs(
+    args: &Args,
+    tournament: &TournamentFile,
+    legend_db: &HashMap<String, Legend>,
+    legends: &[LegendCount],
+) -> Result<()> {
+    let tiles = build_layout(legends);
+    let svg = render_svg(&tournament.tournament, legend_db, &tiles, &args.assets)?;
 
     let svg_path = args
         .svg
+        .clone()
         .unwrap_or_else(|| args.output.with_extension("svg"));
 
-    if let Some(parent) = svg_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
+    ensure_parent_dir(&args.output)?;
+    ensure_parent_dir(&svg_path)?;
 
     fs::write(&svg_path, &svg)
         .with_context(|| format!("Could not write {}", svg_path.display()))?;
 
+    render_png(&svg, &args.output)?;
+
+    println!("Generated: {}", args.output.display());
+    println!("SVG:       {}", svg_path.display());
+
+    Ok(())
+}
+
+fn ensure_parent_dir(path: &Path) -> Result<()> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Could not create directory {}", parent.display()))?;
+    }
+
+    Ok(())
+}
+
+fn render_png(svg: &str, output: &Path) -> Result<()> {
     let opt = resvg::usvg::Options::default();
-    let tree = resvg::usvg::Tree::from_str(&svg, &opt).context("Could not parse generated SVG")?;
+    let tree = resvg::usvg::Tree::from_str(svg, &opt).context("Could not parse generated SVG")?;
     let mut pixmap = resvg::tiny_skia::Pixmap::new(config::CANVAS_WIDTH, config::CANVAS_HEIGHT)
         .context("Could not allocate output image")?;
 
@@ -122,11 +169,10 @@ fn main() -> Result<()> {
         &mut pixmap.as_mut(),
     );
     pixmap
-        .save_png(&args.output)
-        .with_context(|| format!("Could not write {}", args.output.display()))?;
-
-    println!("Generated: {}", args.output.display());
-    println!("SVG:       {}", svg_path.display());
-
-    Ok(())
+        .save_png(output)
+        .with_context(|| format!("Could not write {}", output.display()))
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/entrypoint.rs"]
+mod tests;

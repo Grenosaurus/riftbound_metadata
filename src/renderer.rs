@@ -6,8 +6,12 @@ use crate::layout::Tile;
 use crate::models::{Legend, Tournament};
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
-use image::{imageops, GenericImageView, ImageFormat};
-use std::{collections::HashMap, fs, io::Cursor, path::Path};
+use image::{imageops, GenericImageView, ImageFormat, ImageReader};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    io::Cursor,
+    path::{Path, PathBuf},
+};
 
 const ART_CROP_LEFT: f32 = 0.06;
 const ART_CROP_RIGHT: f32 = 0.94;
@@ -27,8 +31,11 @@ fn image_href(path: &Path) -> Result<Option<String>> {
         return Ok(None);
     }
 
-    let bytes = fs::read(path)?;
-    let source = image::load_from_memory(&bytes)
+    let source = ImageReader::open(path)
+        .with_context(|| format!("Could not read artwork {}", path.display()))?
+        .with_guessed_format()
+        .with_context(|| format!("Could not inspect artwork {}", path.display()))?
+        .decode()
         .with_context(|| format!("Could not decode artwork {}", path.display()))?;
     let (width, height) = source.dimensions();
     let crop_x = (width as f32 * ART_CROP_LEFT).round() as u32;
@@ -55,10 +62,12 @@ pub fn render_svg(
     tiles: &[Tile],
     assets: &Path,
 ) -> Result<String> {
-    let mut s = format!(
+    let mut image_cache: HashMap<PathBuf, Option<String>> = HashMap::with_capacity(tiles.len());
+    let mut s = String::with_capacity(4096);
+    s.push_str(&format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="0 0 {} {}"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="{}"/><stop offset="100%" stop-color="#10283B"/></linearGradient><filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-opacity="0.35"/></filter></defs><rect width="100%" height="100%" fill="url(#bg)"/>"##,
         CANVAS_WIDTH, CANVAS_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, BACKGROUND
-    );
+    ));
 
     s.push_str(&format!(r##"<text x="90" y="72" fill="{}" font-family="Arial,sans-serif" font-size="30" font-weight="700" letter-spacing="4">RIFTBOUND</text>"##,
                         ACCENT));
@@ -107,7 +116,16 @@ pub fn render_svg(
                             border = border,
                             bw = BORDER_WIDTH));
 
-        if let Some(image) = image_href(&assets.join(&d.image))? {
+        let image_path = assets.join(&d.image);
+        let cached_image = match image_cache.entry(image_path) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => {
+                let image = image_href(entry.key())?;
+                entry.insert(image)
+            }
+        };
+
+        if let Some(image) = cached_image {
             let clip = format!(
                 "clip_{}",
                 tile.key.replace(|c: char| !c.is_ascii_alphanumeric(), "_")
@@ -181,3 +199,7 @@ pub fn render_svg(
 
     Ok(s)
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/renderer.rs"]
+mod tests;

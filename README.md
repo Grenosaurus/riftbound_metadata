@@ -1,69 +1,148 @@
-# Riftbound Meta Generator (Rust) — Piltover Archive artwork sync
+# Riftbound Meta Generator
 
-This program generates a 1920×1080 PNG and matching SVG from local tournament data. Before rendering, it can download missing Legend artwork from Piltover Archive and cache the original, uncropped files in `assets/legends/`. For display, the renderer trims the top and side borders and the lower text area. Square Legend tiles are arranged in a grid sized to use the available canvas; entries are ordered by tournament count, and the count is shown on each tile.
+This Rust command-line program reads tournament and Legend metadata from JSON, optionally downloads missing Legend artwork from Piltover Archive, and generates a 1920×1080 PNG and SVG meta breakdown.
+
+The output includes the tournament name and player count, and shows the tournament date when one is provided. Only Legends with counts greater than zero are included in the output or considered for artwork downloads.
 
 ## Requirements
 
 - Rust and Cargo: https://www.rust-lang.org/tools/install
-- Internet access on the first run to fetch missing artwork (optional after the cache is populated)
+- Internet access to download artwork that is not already cached (unless using `--skip-artwork`)
 
 ## Run
 
 From the project directory:
 
-```bash
+```powershell
 cargo run
 ```
 
-The program reads `data/tournament.json` and `data/legends.json`, downloads missing art for Legends in the tournament, and writes `output/meta.png` and `output/meta.svg`.
+## Tests
 
-## Options
+Run all unit and command-line integration tests with:
 
-```bash
-# Choose input files
+```powershell
+cargo test
+```
+
+All tests use local fixtures and run offline. They cover CLI help and input
+errors; SVG/PNG generation and dimensions; output path handling; filtering and
+ordering; tournament and Legend text escaping; layout boundaries and overlap;
+faction colors; artwork cropping, variant selection, cache use, and error
+handling. They do not call Piltover Archive, so API availability and remote
+downloads are not validated by `cargo test`.
+
+Optional formatting and lint checks:
+
+```powershell
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+```
+
+By default, the program reads `data/tournament.json` and `data/legends.json`, then writes:
+
+- PNG: `output/meta.png`
+- SVG: `output/meta.svg`
+
+All relative paths are resolved from the current working directory.
+
+## Command-line options
+
+Run `cargo run -- --help` to see the CLI help. The available arguments are:
+
+| Argument | Default | Purpose |
+|---|---|---|
+| `tournament` | `data/tournament.json` | Tournament data JSON file (positional argument) |
+| `--legends` | `data/legends.json` | Legend metadata JSON file |
+| `--output` | `output/meta.png` | PNG output path |
+| `--svg` | Same path as `--output` with `.svg` extension | Optional SVG output path |
+| `--assets` | `../DataFiles/RiftboundAssets/legends` | Artwork cache directory |
+| `--skip-artwork` | Off | Do not contact Piltover Archive; render using local artwork only |
+| `--refresh-artwork` | Off | Re-download artwork for positive-count tournament Legends, even if cached |
+
+Examples:
+
+```powershell
+# Choose the tournament and metadata files
 cargo run -- data/tournament.json --legends data/legends.json
 
 # Choose output paths
 cargo run -- --output output/my_meta.png --svg output/my_meta.svg
 
-# Render offline, using only artwork already in assets/legends
+# Render offline from the configured artwork cache
 cargo run -- --skip-artwork
 
-# Force re-download of artwork used in this tournament
+# Force artwork downloads for Legends with counts greater than zero
 cargo run -- --refresh-artwork
 
-# Custom asset folder
+# Use a different artwork cache
 cargo run -- --assets assets/legends
 ```
 
-## How artwork sync works
+## Input data
 
-1. The app reads the tournament's Legend keys and only considers entries with a count greater than zero for artwork downloads.
-2. It requests pages from `https://piltoverarchive.com/api/external/v1/cards`, filtering for Legend cards and artwork.
-3. It matches the returned card name to the full local name (`name` + `title`). If the local image filename ends with a set suffix such as `_ogn`, `_ven`, `_sfd`, `_rad`, `_unl`, or `_ogs`, it prefers a printing from that set.
-4. It downloads the chosen `imageUrl` unchanged to the filename already defined in `data/legends.json`.
-5. Cached images are reused on later runs. `--refresh-artwork` forces re-downloads.
+`data/tournament.json` contains a `tournament` object with:
 
-The display crop is applied only when generating the SVG/PNG; the cached artwork remains the full downloaded image. If your cache contains previously cropped artwork, run with `--refresh-artwork` once to replace it with the full images.
+- `name`: tournament name
+- `date`: optional date string; an empty string omits the date from the output
+- `players`: player count
 
-Legends are ordered from highest to lowest tournament count. Legends with the same count are kept together in a row whenever they fit at a reasonable tile size, so a tied Legend does not appear below a more popular tier just because the row ran out of space.
+It also contains a `legends` object mapping Legend IDs to tournament counts. Counts of zero are excluded from both the rendered output and artwork synchronization.
 
-The API is publicly accessible according to community reverse-engineered documentation, but it is not an officially published/stable API and may change. The program uses no API key. Requests are paginated (limit 100), the API response is cached indirectly through local image files, and a small delay is used between image downloads. Check Piltover Archive's terms and Riot Games' applicable policies before redistributing card art.
+`data/legends.json` maps those IDs to Legend metadata: `name`, `title`, `image`, and `faction`. Counts are supplied in the tournament file; they are not fetched from Piltover Archive.
 
-If the API is unavailable, the program warns and continues with any local artwork already present. Missing images render as blank tile backgrounds. If a card is not matched automatically, check its spelling/title and the archive's card record.
+Example tournament file:
 
-## Data files
+```json
+{
+  "tournament": {
+    "name": "Local Skirmish",
+    "date": "2026-10-31",
+    "players": 16
+  },
+  "legends": {
+    "ahri_ogn": 4,
+    "darius_ogn": 2
+  }
+}
+```
 
-- `data/tournament.json`: tournament title and counts keyed by the IDs in `data/legends.json`.
-- `data/legends.json`: local display metadata, target image filenames, and faction names/colors.
+Example Legend metadata:
 
-Counts are entered by you; they are **not** fetched from Piltover Archive. The archive integration is for artwork only.
+```json
+{
+  "ahri_ogn": {
+    "name": "Ahri",
+    "title": "The Fox",
+    "image": "ahri_ogn.png",
+    "faction": "Ionia"
+  }
+}
+```
+
+`date` and `players` may be omitted; they default to no date and zero players.
+Legends with zero counts are ignored. Positive-count IDs missing from
+`legends.json` are skipped with a warning.
+
+## Artwork behavior
+
+By default, artwork is synchronized only for tournament Legends whose count is greater than zero and whose image is not already present in the configured cache. Cached images are reused on later runs. `--refresh-artwork` forces a new download for the positive-count Legends, and `--skip-artwork` disables synchronization entirely.
+
+The program requests paginated card data from `https://piltoverarchive.com/api/external/v1/cards`, matches card names to the local Legend metadata, and prefers the set indicated by the image filename when possible. It downloads the selected image unchanged into the cache; display cropping is applied during rendering, not to the cached image.
+
+If artwork synchronization fails, the program prints a warning and continues
+with any cached artwork. A tile whose image is missing renders without that
+image; an existing but unreadable or corrupt image causes rendering to fail.
+The external API is community-documented, not an official stable contract, and
+may change. Check Piltover Archive's terms and applicable Riot Games policies
+before redistributing card artwork.
 
 ## Project structure
 
 ```text
-riftbound_meta_rust/
+riftbound_metadata/
 ├── Cargo.toml
+├── Cargo.lock
 ├── README.md
 ├── src/
 │   ├── main.rs
@@ -72,11 +151,85 @@ riftbound_meta_rust/
 │   ├── layout.rs
 │   ├── renderer.rs
 │   └── artwork.rs
+├── tests/
+│   ├── cli.rs
+│   ├── cli/
+│   │   ├── arguments.rs
+│   │   ├── common.rs
+│   │   ├── errors.rs
+│   │   └── generation.rs
+│   └── unit/
+│       ├── artwork.rs
+│       ├── config.rs
+│       ├── entrypoint.rs
+│       ├── layout.rs
+│       └── renderer.rs
 ├── data/
 │   ├── tournament.json
 │   └── legends.json
-├── assets/
-│   ├── legends/
-│   └── logos/
-└── output/
+└── output/                 # Generated output; created when the program runs
+```
+
+The artwork cache is outside the project by default (`../DataFiles/RiftboundAssets/legends`) and can be changed with `--assets`.
+
+## Program architecture
+
+`main.rs` parses arguments and coordinates the workflow. It loads the JSON
+inputs, optionally synchronizes missing artwork, filters and sorts Legends,
+builds the tile layout, writes the SVG, and rasterizes it to PNG. The rendering
+and artwork-sync failures are reported with context; artwork-sync failures are
+warnings so rendering can continue with cached files.
+
+Unit tests are stored under `tests/unit/` and included by their corresponding
+source modules when testing. End-to-end CLI tests are grouped under
+`tests/cli/`.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant CLI as main.rs
+    participant Tournament as tournament.json
+    participant LegendData as legends.json
+    participant Artwork as artwork.rs
+    participant Archive as Piltover Archive API
+    participant Cache as Artwork cache
+    participant Layout as layout.rs
+    participant Renderer as renderer.rs
+    participant Output as output files
+
+    User->>CLI: Run with CLI arguments
+    CLI->>Tournament: Read tournament metadata and counts
+    Tournament-->>CLI: Tournament data
+    CLI->>LegendData: Read Legend metadata
+    LegendData-->>CLI: Legend definitions
+
+    opt Artwork sync enabled (default)
+        CLI->>Artwork: Sync positive-count Legends
+        Artwork->>Cache: Check for missing image files
+        alt All required artwork is cached
+            Cache-->>Artwork: No downloads needed
+        else Artwork is missing or refresh requested
+            Artwork->>Archive: Fetch paginated Legend card variants
+            Archive-->>Artwork: Card names, variants, and image URLs
+            loop Each required uncached or refreshed Legend
+                Artwork->>Archive: Download selected image
+                Archive-->>Artwork: Original image bytes
+                Artwork->>Cache: Save image unchanged
+            end
+        end
+        Artwork-->>CLI: Sync complete or warning on failure
+    end
+
+    CLI->>CLI: Exclude zero-count and unknown Legends, then sort by count
+    CLI->>Layout: Build tile positions and sizes
+    Layout-->>CLI: Legend tiles
+    CLI->>Renderer: Render tournament, tiles, and artwork
+    Renderer->>Cache: Read available local artwork
+    Cache-->>Renderer: Image files
+    Renderer->>Renderer: Crop for display and generate SVG
+    Renderer-->>CLI: SVG content
+    CLI->>Output: Write SVG
+    CLI->>CLI: Parse SVG and rasterize to PNG
+    CLI->>Output: Write PNG
+    CLI-->>User: Report generated file paths
 ```

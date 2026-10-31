@@ -276,3 +276,7 @@ pub fn sync_artwork(
 
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/artwork.rs"]
+mod tests;

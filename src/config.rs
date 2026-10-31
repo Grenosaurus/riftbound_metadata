@@ -31,3 +31,7 @@ pub fn faction_color(faction: &str) -> &'static str {
         _ => ACCENT,
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/config.rs"]
+mod tests;
