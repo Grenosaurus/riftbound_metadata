@@ -41,6 +41,8 @@ struct ApiCard {
     name: Option<String>,
 }
 
+type VariantIndex<'a> = HashMap<String, Vec<(usize, &'a ApiVariant)>>;
+
 fn normalize(s: &str) -> String {
     s.chars()
         .filter(|c| c.is_alphanumeric())
@@ -125,13 +127,25 @@ fn has_http_image(variant: &ApiVariant) -> bool {
         .is_some_and(|url| url.starts_with("https://") || url.starts_with("http://"))
 }
 
-fn matches_legend_name(variant: &ApiVariant, full_name: &str, name: &str) -> bool {
-    variant
-        .card
-        .as_ref()
-        .and_then(|card| card.name.as_deref())
-        .map(normalize)
-        .is_some_and(|variant_name| variant_name == full_name || variant_name == name)
+fn index_variants(variants: &[ApiVariant]) -> VariantIndex<'_> {
+    let mut index = HashMap::new();
+
+    for (position, variant) in variants.iter().enumerate() {
+        if !has_http_image(variant) {
+            continue;
+        }
+
+        let Some(name) = variant.card.as_ref().and_then(|card| card.name.as_deref()) else {
+            continue;
+        };
+
+        index
+            .entry(normalize(name))
+            .or_insert_with(Vec::new)
+            .push((position, variant));
+    }
+
+    index
 }
 
 fn is_preferred_set(variant: &ApiVariant, set: &str) -> bool {
@@ -151,46 +165,83 @@ fn is_special_variant(variant: &ApiVariant) -> bool {
         })
 }
 
-fn choose_variant<'a>(variants: &'a [ApiVariant], legend: &Legend) -> Option<&'a ApiVariant> {
+fn choose_variant<'a>(variants: &VariantIndex<'a>, legend: &Legend) -> Option<&'a ApiVariant> {
     let full_name = format!("{}, {}", legend.name, legend.title);
     let full_normalized = normalize(&full_name);
     let name_normalized = normalize(&legend.name);
 
-    let mut matches: Vec<&ApiVariant> = variants
-        .iter()
-        .filter(|variant| {
-            has_http_image(variant)
-                && matches_legend_name(variant, &full_normalized, &name_normalized)
-        })
-        .collect();
+    let full_name_matches = variants
+        .get(&full_normalized)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let name_matches = if full_normalized == name_normalized {
+        &[]
+    } else {
+        variants
+            .get(&name_normalized)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+    };
+    let preferred_set = preferred_set(&legend.image);
+    let mut full_index = 0;
+    let mut name_index = 0;
+    let mut first_matching_set = None;
+    let mut first_standard = None;
+    let mut first_match = None;
 
-    if let Some(set) = preferred_set(&legend.image) {
-        if let Some(found) = matches
-            .iter()
-            .copied()
-            .find(|variant| is_preferred_set(variant, set))
+    while full_index < full_name_matches.len() || name_index < name_matches.len() {
+        let (_, variant) = match (
+            full_name_matches.get(full_index),
+            name_matches.get(name_index),
+        ) {
+            (Some(full), Some(name)) if full.0 < name.0 => {
+                full_index += 1;
+                *full
+            }
+            (Some(_), Some(name)) => {
+                name_index += 1;
+                *name
+            }
+            (Some(full), None) => {
+                full_index += 1;
+                *full
+            }
+            (None, Some(name)) => {
+                name_index += 1;
+                *name
+            }
+            (None, None) => break,
+        };
+
+        first_match.get_or_insert(variant);
+
+        if first_matching_set.is_none()
+            && preferred_set.is_some_and(|set| is_preferred_set(variant, set))
         {
-            return Some(found);
+            first_matching_set = Some(variant);
+        }
+
+        if first_standard.is_none() && !is_special_variant(variant) {
+            first_standard = Some(variant);
         }
     }
 
-    matches.sort_by_key(|variant| is_special_variant(variant));
-
-    matches.into_iter().next()
+    first_matching_set.or(first_standard).or(first_match)
 }
 
 pub fn sync_artwork(
     legend_db: &HashMap<String, Legend>,
-    tournament_keys: &[String],
+    tournament_legends: &HashMap<String, u32>,
     assets_dir: &Path,
     refresh: bool,
 ) -> Result<()> {
     fs::create_dir_all(assets_dir)
         .with_context(|| format!("Could not create {}", assets_dir.display()))?;
 
-    let needed: Vec<(&String, &Legend)> = tournament_keys
+    let needed: Vec<(&String, &Legend)> = tournament_legends
         .iter()
-        .filter_map(|key| legend_db.get(key).map(|legend| (key, legend)))
+        .filter(|(_, count)| **count > 0)
+        .filter_map(|(key, _)| legend_db.get(key).map(|legend| (key, legend)))
         .filter(|(_, legend)| refresh || !assets_dir.join(&legend.image).is_file())
         .collect();
 
@@ -208,13 +259,14 @@ pub fn sync_artwork(
     println!("Fetching Legend card records from Piltover Archive...");
 
     let variants = fetch_all_variants(&client)?;
+    let variant_index = index_variants(&variants);
     let mut downloaded = 0_usize;
     let mut unmatched = 0_usize;
 
     for (key, legend) in needed {
         let target = assets_dir.join(&legend.image);
 
-        let Some(variant) = choose_variant(&variants, legend) else {
+        let Some(variant) = choose_variant(&variant_index, legend) else {
             eprintln!(
                 "Warning: no matching Piltover Archive artwork found for {} ({key}).",
                 legend.name

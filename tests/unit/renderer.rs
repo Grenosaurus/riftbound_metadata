@@ -1,33 +1,7 @@
 use super::*;
 use crate::layout::Tile;
-use std::{
-    fs,
-    path::PathBuf,
-    sync::atomic::{AtomicUsize, Ordering},
-};
-
-static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
-
-struct TestDir(PathBuf);
-
-impl TestDir {
-    fn new() -> Self {
-        let id = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "riftbound_renderer_test_{}_{}",
-            std::process::id(),
-            id
-        ));
-        fs::create_dir_all(&path).expect("create test directory");
-        Self(path)
-    }
-}
-
-impl Drop for TestDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
+use crate::test_support::TestDir;
+use std::fs;
 
 fn legend(name: &str, title: &str, image: &str, faction: &str) -> Legend {
     Legend {

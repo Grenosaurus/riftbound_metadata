@@ -64,140 +64,181 @@ pub fn render_svg(
 ) -> Result<String> {
     let mut image_cache: HashMap<PathBuf, Option<String>> = HashMap::with_capacity(tiles.len());
     let mut s = String::with_capacity(4096);
-    s.push_str(&format!(
+    append_svg_start(&mut s);
+    append_tournament_header(&mut s, t);
+
+    for tile in tiles {
+        if let Some(legend) = legends.get(&tile.key) {
+            append_tile(&mut s, tile, legend, assets, &mut image_cache)?;
+        }
+    }
+
+    s.push_str("</svg>");
+    Ok(s)
+}
+
+fn append_svg_start(svg: &mut String) {
+    svg.push_str(&format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="0 0 {} {}"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="{}"/><stop offset="100%" stop-color="#10283B"/></linearGradient><filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-opacity="0.35"/></filter></defs><rect width="100%" height="100%" fill="url(#bg)"/>"##,
         CANVAS_WIDTH, CANVAS_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, BACKGROUND
     ));
+}
 
-    s.push_str(&format!(r##"<text x="90" y="72" fill="{}" font-family="Arial,sans-serif" font-size="30" font-weight="700" letter-spacing="4">RIFTBOUND</text>"##,
+fn append_tournament_header(svg: &mut String, tournament: &Tournament) {
+    svg.push_str(&format!(r##"<text x="90" y="72" fill="{}" font-family="Arial,sans-serif" font-size="30" font-weight="700" letter-spacing="4">RIFTBOUND</text>"##,
                         ACCENT));
 
-    if let Some(date) = t
+    if let Some(date) = tournament
         .date
         .as_deref()
         .map(str::trim)
         .filter(|date| !date.is_empty())
     {
-        s.push_str(&format!(
+        svg.push_str(&format!(
             r##"<text x="1830" y="72" text-anchor="end" fill="{}" font-family="Arial,sans-serif" font-size="18">{}</text>"##,
             MUTED_TEXT,
             esc(date)
         ));
     }
 
-    s.push_str(&format!(r##"<text x="90" y="126" fill="{}" font-family="Arial,sans-serif" font-size="48" font-weight="800">LEGEND META BREAKDOWN</text>"##,
+    svg.push_str(&format!(r##"<text x="90" y="126" fill="{}" font-family="Arial,sans-serif" font-size="48" font-weight="800">LEGEND META BREAKDOWN</text>"##,
                         TEXT));
 
-    let tournament_label = if t.players == 1 {
-        format!("{} (1 player)", t.name)
+    let player_label = if tournament.players == 1 {
+        format!("{} (1 player)", tournament.name)
     } else {
-        format!("{} ({} players)", t.name, t.players)
+        format!("{} ({} players)", tournament.name, tournament.players)
     };
-    s.push_str(&format!(r##"<text x="90" y="165" fill="{}" font-family="Arial,sans-serif" font-size="22">{}</text><line x1="90" y1="195" x2="1830" y2="195" stroke="{}" stroke-opacity="0.45" stroke-width="2"/>"##,
+    svg.push_str(&format!(r##"<text x="90" y="165" fill="{}" font-family="Arial,sans-serif" font-size="22">{}</text><line x1="90" y1="195" x2="1830" y2="195" stroke="{}" stroke-opacity="0.45" stroke-width="2"/>"##,
                         MUTED_TEXT,
-                        esc(&tournament_label),
+                        esc(&player_label),
                         ACCENT));
+}
 
-    for tile in tiles {
-        let Some(d) = legends.get(&tile.key) else {
-            continue;
-        };
+fn append_tile(
+    svg: &mut String,
+    tile: &Tile,
+    legend: &Legend,
+    assets: &Path,
+    image_cache: &mut HashMap<PathBuf, Option<String>>,
+) -> Result<()> {
+    let border = faction_color(&legend.faction);
+    let (x, y, width, height) = (tile.x, tile.y, tile.width, tile.height);
 
-        let border = faction_color(&d.faction);
-        let (x, y, w, h) = (tile.x, tile.y, tile.width, tile.height);
+    svg.push_str(&format!(r##"<rect x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" rx="{r}" fill="{panel}" stroke="{border}" stroke-width="{bw}" filter="url(#shadow)"/>"##,
+                        x = x,
+                        y = y,
+                        w = width,
+                        h = height,
+                        r = BORDER_RADIUS,
+                        panel = PANEL,
+                        border = border,
+                        bw = BORDER_WIDTH));
 
-        s.push_str(&format!(r##"<rect x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" rx="{r}" fill="{panel}" stroke="{border}" stroke-width="{bw}" filter="url(#shadow)"/>"##,
-                            x = x,
-                            y = y,
-                            w = w,
-                            h = h,
-                            r = BORDER_RADIUS,
-                            panel = PANEL,
-                            border = border,
-                            bw = BORDER_WIDTH));
+    append_tile_artwork(svg, tile, legend, assets, image_cache)?;
+    append_count_badge(svg, tile, x, y, width, height);
+    append_legend_labels(svg, legend, x, y, width, height);
+    Ok(())
+}
 
-        let image_path = assets.join(&d.image);
-        let cached_image = match image_cache.entry(image_path) {
-            Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => {
-                let image = image_href(entry.key())?;
-                entry.insert(image)
-            }
-        };
-
-        if let Some(image) = cached_image {
-            let clip = format!(
-                "clip_{}",
-                tile.key.replace(|c: char| !c.is_ascii_alphanumeric(), "_")
-            );
-
-            s.push_str(&format!(r##"<clipPath id="{clip}"><rect x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" rx="{r}"/></clipPath><image href="{image}" x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" preserveAspectRatio="xMidYMid meet" opacity="0.78" clip-path="url(#{clip})"/><rect x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" rx="{r}" fill="#000000" fill-opacity="0.28"/>"##,
-                                clip = clip,
-                                x = x,
-                                y = y,
-                                w = w,
-                                h = h,
-                                r = BORDER_RADIUS,
-                                image = image));
+fn append_tile_artwork(
+    svg: &mut String,
+    tile: &Tile,
+    legend: &Legend,
+    assets: &Path,
+    image_cache: &mut HashMap<PathBuf, Option<String>>,
+) -> Result<()> {
+    let image_path = assets.join(&legend.image);
+    let cached_image = match image_cache.entry(image_path) {
+        Entry::Occupied(entry) => entry.into_mut(),
+        Entry::Vacant(entry) => {
+            let image = image_href(entry.key())?;
+            entry.insert(image)
         }
+    };
 
-        let bh = 30.0_f32.min(h * 0.12);
-        let by = y + 12.0;
-        let bw = 54.0_f32.min(w * 0.25);
-        let bx = x + 12.0;
+    if let Some(image) = cached_image {
+        let clip = format!(
+            "clip_{}",
+            tile.key.replace(|c: char| !c.is_ascii_alphanumeric(), "_")
+        );
 
-        s.push_str(&format!(r##"<rect x="{bx:.1}" y="{by:.1}" width="{bw:.1}" height="{bh:.1}" rx="9" fill="#000000" fill-opacity="0.62"/><text x="{cx:.1}" y="{cy:.1}" text-anchor="middle" fill="{text}" font-family="Arial,sans-serif" font-size="{fs:.1}" font-weight="700">{count}</text>"##,
-                            bx = bx,
-                            by = by,
-                            bw = bw,
-                            bh = bh,
-                            cx = bx + bw / 2.0,
-                            cy = by + bh * 0.70,
-                            text = TEXT,
-                            fs = (bh * 0.58).clamp(12.0, 16.0),
-                            count = tile.count));
-
-        let ts = (w / 16.0).clamp(14.0, 25.0);
-        let ss = (w / 24.0).clamp(10.0, 15.0);
-        let legend_name = d.name.to_uppercase();
-        let name_x = x + w / 2.0;
-        let name_y = y + h - 43.0;
-        let max_name_width = (w - 24.0).max(1.0);
-        let estimated_name_width = legend_name
-            .chars()
-            .map(|character| match character {
-                'I' | '!' | '.' | ',' | '\'' => 0.35,
-                'J' | 'L' | 'T' => 0.55,
-                'M' | 'W' => 0.9,
-                _ => 0.68,
-            })
-            .sum::<f32>()
-            * ts;
-        let name_font_size = if estimated_name_width > max_name_width {
-            ts * max_name_width / estimated_name_width
-        } else {
-            ts
-        };
-        s.push_str(&format!(
-            r##"<text x="{name_x:.1}" y="{name_y:.1}" text-anchor="middle" fill="{text}" font-family="Arial,sans-serif" font-size="{font_size:.1}" font-weight="800">{name}</text>"##,
-            name_x = name_x,
-            name_y = name_y,
-            text = TEXT,
-            font_size = name_font_size,
-            name = esc(&legend_name),
-        ));
-
-        s.push_str(&format!(r##"<text x="{x2:.1}" y="{y2:.1}" text-anchor="middle" fill="{muted}" font-family="Arial,sans-serif" font-size="{ss:.1}" font-weight="600">{title}</text>"##,
-                            x2 = x + w / 2.0,
-                            y2 = y + h - 19.0,
-                            muted = MUTED_TEXT,
-                            ss = ss,
-                            title = esc(&d.title)));
+        svg.push_str(&format!(r##"<clipPath id="{clip}"><rect x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" rx="{r}"/></clipPath><image href="{image}" x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" preserveAspectRatio="xMidYMid meet" opacity="0.78" clip-path="url(#{clip})"/><rect x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" rx="{r}" fill="#000000" fill-opacity="0.28"/>"##,
+                            clip = clip,
+                            x = tile.x,
+                            y = tile.y,
+                            w = tile.width,
+                            h = tile.height,
+                            r = BORDER_RADIUS,
+                            image = image));
     }
 
-    s.push_str("</svg>");
+    Ok(())
+}
 
-    Ok(s)
+fn append_count_badge(svg: &mut String, tile: &Tile, x: f32, y: f32, width: f32, height: f32) {
+    let badge_height = 30.0_f32.min(height * 0.12);
+    let badge_y = y + 12.0;
+    let badge_width = 54.0_f32.min(width * 0.25);
+    let badge_x = x + 12.0;
+
+    svg.push_str(&format!(r##"<rect x="{bx:.1}" y="{by:.1}" width="{bw:.1}" height="{bh:.1}" rx="9" fill="#000000" fill-opacity="0.62"/><text x="{cx:.1}" y="{cy:.1}" text-anchor="middle" fill="{text}" font-family="Arial,sans-serif" font-size="{fs:.1}" font-weight="700">{count}</text>"##,
+                        bx = badge_x,
+                        by = badge_y,
+                        bw = badge_width,
+                        bh = badge_height,
+                        cx = badge_x + badge_width / 2.0,
+                        cy = badge_y + badge_height * 0.70,
+                        text = TEXT,
+                        fs = (badge_height * 0.58).clamp(12.0, 16.0),
+                        count = tile.count));
+}
+
+fn append_legend_labels(
+    svg: &mut String,
+    legend: &Legend,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+) {
+    let title_font_size = (width / 16.0).clamp(14.0, 25.0);
+    let subtitle_font_size = (width / 24.0).clamp(10.0, 15.0);
+    let name = legend.name.to_uppercase();
+    let name_x = x + width / 2.0;
+    let name_y = y + height - 43.0;
+    let max_name_width = (width - 24.0).max(1.0);
+    let estimated_name_width = name
+        .chars()
+        .map(|character| match character {
+            'I' | '!' | '.' | ',' | '\'' => 0.35,
+            'J' | 'L' | 'T' => 0.55,
+            'M' | 'W' => 0.9,
+            _ => 0.68,
+        })
+        .sum::<f32>()
+        * title_font_size;
+    let fitted_name_font_size = if estimated_name_width > max_name_width {
+        title_font_size * max_name_width / estimated_name_width
+    } else {
+        title_font_size
+    };
+
+    svg.push_str(&format!(
+        r##"<text x="{name_x:.1}" y="{name_y:.1}" text-anchor="middle" fill="{text}" font-family="Arial,sans-serif" font-size="{font_size:.1}" font-weight="800">{name}</text>"##,
+        name_x = name_x,
+        name_y = name_y,
+        text = TEXT,
+        font_size = fitted_name_font_size,
+        name = esc(&name),
+    ));
+
+    svg.push_str(&format!(r##"<text x="{x2:.1}" y="{y2:.1}" text-anchor="middle" fill="{muted}" font-family="Arial,sans-serif" font-size="{ss:.1}" font-weight="600">{title}</text>"##,
+                        x2 = x + width / 2.0,
+                        y2 = y + height - 19.0,
+                        muted = MUTED_TEXT,
+                        ss = subtitle_font_size,
+                        title = esc(&legend.title)));
 }
 
 #[cfg(test)]

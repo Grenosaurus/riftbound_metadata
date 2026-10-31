@@ -171,7 +171,8 @@ riftbound_metadata/
 │       ├── config.rs
 │       ├── entrypoint.rs
 │       ├── layout.rs
-│       └── renderer.rs
+│       ├── renderer.rs
+│       └── test_support.rs
 ├── data/
 │   └── legends.json
 ```
@@ -192,8 +193,8 @@ and artwork-sync failures are reported with context; artwork-sync failures are
 warnings so rendering can continue with cached files.
 
 Unit tests are stored under `tests/unit/` and included by their corresponding
-source modules when testing. End-to-end CLI tests are grouped under
-`tests/cli/`.
+source modules when testing. Shared unit-test utilities are in
+`tests/unit/test_support.rs`. End-to-end CLI tests are grouped under `tests/cli/`.
 
 ```mermaid
 sequenceDiagram

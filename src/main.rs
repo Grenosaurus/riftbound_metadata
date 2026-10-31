@@ -43,7 +43,6 @@ struct Args {
         help = "SVG output filename. Defaults to the PNG filename with .svg."
     )]
     svg: Option<PathBuf>,
-    /// Do not contact Piltover Archive; render using cached/local artwork only.
     #[arg(
         long,
         help = "Do not contact Piltover Archive; render using cached/local artwork only."
@@ -138,16 +137,9 @@ fn sync_artwork_if_enabled(
         return;
     }
 
-    let tournament_keys: Vec<String> = tournament
-        .legends
-        .iter()
-        .filter(|(_, count)| **count > 0)
-        .map(|(key, _)| key.clone())
-        .collect();
-
     if let Err(err) = artwork::sync_artwork(
         legend_db,
-        &tournament_keys,
+        &tournament.legends,
         assets_dir,
         args.refresh_artwork,
     ) {
@@ -210,6 +202,10 @@ fn render_png(svg: &str, output: &Path) -> Result<()> {
         .save_png(output)
         .with_context(|| format!("Could not write {}", output.display()))
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/test_support.rs"]
+mod test_support;
 
 #[cfg(test)]
 #[path = "../tests/unit/entrypoint.rs"]

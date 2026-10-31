@@ -1,31 +1,5 @@
 use super::*;
-use std::{
-    path::PathBuf,
-    sync::atomic::{AtomicUsize, Ordering},
-};
-
-static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
-
-struct TestDir(PathBuf);
-
-impl TestDir {
-    fn new() -> Self {
-        let id = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "riftbound_artwork_test_{}_{}",
-            std::process::id(),
-            id
-        ));
-        fs::create_dir_all(&path).expect("create test directory");
-        Self(path)
-    }
-}
-
-impl Drop for TestDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
+use crate::test_support::TestDir;
 
 fn legend(image: &str) -> Legend {
     Legend {
@@ -44,6 +18,10 @@ fn variant(name: Option<&str>, number: Option<&str>, url: Option<&str>) -> ApiVa
             name: Some(name.to_owned()),
         }),
     }
+}
+
+fn select_variant<'a>(variants: &'a [ApiVariant], legend: &Legend) -> Option<&'a ApiVariant> {
+    choose_variant(&index_variants(variants), legend)
 }
 
 #[test]
@@ -75,7 +53,7 @@ fn choose_variant_prefers_the_requested_set() {
         variant(Some("Ahri, The Fox"), Some("OGN-001"), Some("https://ogn")),
     ];
 
-    let selected = choose_variant(&variants, &legend("ahri_ogn.png")).unwrap();
+    let selected = select_variant(&variants, &legend("ahri_ogn.png")).unwrap();
     assert_eq!(selected.image_url.as_deref(), Some("https://ogn"));
 }
 
@@ -86,8 +64,30 @@ fn choose_variant_accepts_name_only_and_prefers_standard_artwork() {
         variant(Some("Ahri"), Some("OGN-001"), Some("https://standard")),
     ];
 
-    let selected = choose_variant(&variants, &legend("ahri_other.png")).unwrap();
+    let selected = select_variant(&variants, &legend("ahri_other.png")).unwrap();
     assert_eq!(selected.image_url.as_deref(), Some("https://standard"));
+}
+
+#[test]
+fn choose_variant_preserves_api_order_across_full_and_name_only_matches() {
+    let variants = [
+        variant(
+            Some("Ahri"),
+            Some("OGN-FOIL"),
+            Some("https://name-only-special"),
+        ),
+        variant(
+            Some("Ahri, The Fox"),
+            Some("OGN-001"),
+            Some("https://full-name-standard"),
+        ),
+    ];
+
+    let selected = select_variant(&variants, &legend("ahri_other.png")).unwrap();
+    assert_eq!(
+        selected.image_url.as_deref(),
+        Some("https://full-name-standard")
+    );
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn choose_variant_rejects_nonmatching_names_and_non_http_urls() {
         variant(Some("Ahri"), Some("OGN-001"), None),
     ];
 
-    assert!(choose_variant(&variants, &legend("ahri_ogn.png")).is_none());
+    assert!(select_variant(&variants, &legend("ahri_ogn.png")).is_none());
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn choose_variant_prefers_standard_over_nexus_and_showcase() {
             variant(Some("Ahri"), Some("OGN-001"), Some("https://standard")),
         ];
 
-        let selected = choose_variant(&variants, &legend("ahri_other.png")).unwrap();
+        let selected = select_variant(&variants, &legend("ahri_other.png")).unwrap();
         assert_eq!(selected.image_url.as_deref(), Some("https://standard"));
     }
 }
@@ -125,7 +125,7 @@ fn matching_set_is_preferred_even_when_it_is_a_special_variant() {
         variant(Some("Ahri"), Some("OGN-FOIL"), Some("https://preferred")),
     ];
 
-    let selected = choose_variant(&variants, &legend("ahri_ogn.png")).unwrap();
+    let selected = select_variant(&variants, &legend("ahri_ogn.png")).unwrap();
     assert_eq!(selected.image_url.as_deref(), Some("https://preferred"));
 }
 
@@ -168,18 +168,30 @@ fn artwork_sync_skips_network_when_cache_is_complete() {
     let mut legends = HashMap::new();
     legends.insert("ahri".to_owned(), legend("ahri.png"));
 
-    sync_artwork(&legends, &["ahri".to_owned()], &assets, false).unwrap();
+    sync_artwork(
+        &legends,
+        &HashMap::from([("ahri".to_owned(), 1)]),
+        &assets,
+        false,
+    )
+    .unwrap();
     assert_eq!(fs::read(assets.join("ahri.png")).unwrap(), b"cached");
 }
 
 #[test]
-fn artwork_sync_ignores_zero_count_keys_excluded_by_the_caller() {
+fn artwork_sync_ignores_zero_count_legends() {
     let dir = TestDir::new();
     let assets = dir.0.join("assets");
     let mut legends = HashMap::new();
     legends.insert("ahri".to_owned(), legend("ahri.png"));
 
-    sync_artwork(&legends, &[], &assets, false).unwrap();
+    sync_artwork(
+        &legends,
+        &HashMap::from([("ahri".to_owned(), 0)]),
+        &assets,
+        false,
+    )
+    .unwrap();
     assert!(assets.is_dir());
     assert!(!assets.join("ahri.png").exists());
 }
@@ -190,6 +202,7 @@ fn artwork_sync_reports_directory_creation_errors() {
     let not_a_directory = dir.0.join("file");
     fs::write(&not_a_directory, b"file").unwrap();
 
-    let error = sync_artwork(&HashMap::new(), &[], &not_a_directory, false).unwrap_err();
+    let error =
+        sync_artwork(&HashMap::new(), &HashMap::new(), &not_a_directory, false).unwrap_err();
     assert!(error.to_string().contains("Could not create"));
 }

@@ -8,11 +8,9 @@ pub struct TournamentFile {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct Tournament {
     pub name: String,
 
-    #[serde(default)]
     pub date: Option<String>,
 
     #[serde(default)]
