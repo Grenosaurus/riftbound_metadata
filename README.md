@@ -2,7 +2,7 @@
 
 This Rust command-line program reads tournament and Legend metadata from JSON, optionally downloads missing Legend artwork from Piltover Archive, and generates a 1920×1080 PNG and SVG meta breakdown.
 
-The output includes the tournament name and player count, and shows the tournament date when one is provided. Only Legends with counts greater than zero are included in the output or considered for artwork downloads.
+The output includes the tournament name and shows the player count when it is at least two. The tournament date is shown when one is provided. Only Legends with counts greater than zero are included in the output or considered for artwork downloads.
 
 ## Requirements
 
@@ -105,7 +105,7 @@ Example tournament file:
 {
   "tournament": {
     "name": "Local Skirmish",
-    "date": "2026-10-31",
+    "date": "31/10/2026",
     "players": 16
   },
   "legends": {

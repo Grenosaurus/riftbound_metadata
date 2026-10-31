@@ -104,10 +104,10 @@ fn append_tournament_header(svg: &mut String, tournament: &Tournament) {
     svg.push_str(&format!(r##"<text x="90" y="126" fill="{}" font-family="Arial,sans-serif" font-size="48" font-weight="800">LEGEND META BREAKDOWN</text>"##,
                         TEXT));
 
-    let player_label = if tournament.players == 1 {
-        format!("{} (1 player)", tournament.name)
-    } else {
+    let player_label = if tournament.players >= 2 {
         format!("{} ({} players)", tournament.name, tournament.players)
+    } else {
+        tournament.name.clone()
     };
     svg.push_str(&format!(r##"<text x="90" y="165" fill="{}" font-family="Arial,sans-serif" font-size="22">{}</text><line x1="90" y1="195" x2="1830" y2="195" stroke="{}" stroke-opacity="0.45" stroke-width="2"/>"##,
                         MUTED_TEXT,

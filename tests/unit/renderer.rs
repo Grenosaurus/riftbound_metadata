@@ -43,13 +43,14 @@ fn svg_contains_canvas_and_escaped_tournament_metadata() {
 
     assert!(svg.starts_with("<svg "));
     assert!(svg.contains(r#"width="1920" height="1080" viewBox="0 0 1920 1080""#));
-    assert!(svg.contains("Cup &amp; &lt;Final&gt; (1 player)"));
+    assert!(svg.contains("Cup &amp; &lt;Final&gt;"));
+    assert!(!svg.contains("(1 player)"));
     assert!(svg.contains(">2026-10-31</text>"));
     assert!(svg.ends_with("</svg>"));
 }
 
 #[test]
-fn svg_omits_blank_dates_and_uses_plural_player_label() {
+fn svg_omits_blank_dates_and_player_counts_below_two() {
     let svg = render_svg(
         &tournament("Event", Some("  "), 0),
         &HashMap::new(),
@@ -58,8 +59,29 @@ fn svg_omits_blank_dates_and_uses_plural_player_label() {
     )
     .unwrap();
 
-    assert!(svg.contains("Event (0 players)"));
+    assert!(svg.contains(">Event</text>"));
+    assert!(!svg.contains("players"));
+    assert!(!svg.contains("player"));
     assert!(!svg.contains("text-anchor=\"end\""));
+
+    let svg = render_svg(
+        &tournament("Event", None, 1),
+        &HashMap::new(),
+        &[],
+        Path::new("unused"),
+    )
+    .unwrap();
+    assert!(svg.contains(">Event</text>"));
+    assert!(!svg.contains("player"));
+
+    let svg = render_svg(
+        &tournament("Event", None, 2),
+        &HashMap::new(),
+        &[],
+        Path::new("unused"),
+    )
+    .unwrap();
+    assert!(svg.contains("Event (2 players)"));
 }
 
 #[test]

@@ -104,7 +104,8 @@ fn missing_artwork_still_generates_output() {
         String::from_utf8_lossy(&result.stderr)
     );
     let svg = fs::read_to_string(svg_file).expect("read generated SVG");
-    assert!(svg.contains("Offline event (0 players)"));
+    assert!(svg.contains(">Offline event</text>"));
+    assert!(!svg.contains("player"));
     assert!(svg.contains("AHRI"));
     assert!(!svg.contains("data:image/png;base64,"));
     assert!(output_file.exists());
@@ -172,7 +173,8 @@ fn zero_legends_still_produces_a_valid_empty_breakdown() {
 
     assert!(result.status.success());
     let svg = fs::read_to_string(svg_file).expect("read SVG");
-    assert!(svg.contains("No entries (0 players)"));
+    assert!(svg.contains(">No entries</text>"));
+    assert!(!svg.contains("player"));
     assert!(!svg.contains(">ZERO</text>"));
     assert!(output_file.exists());
 }
@@ -229,7 +231,7 @@ fn custom_tournament_and_output_filenames_stay_in_their_default_folders() {
     );
     assert!(output_file.is_file());
     assert!(svg_file.is_file());
-    assert!(fs::read_to_string(svg_file)
-        .unwrap()
-        .contains("Weekly Event (0 players)"));
+    let svg = fs::read_to_string(svg_file).unwrap();
+    assert!(svg.contains(">Weekly Event</text>"));
+    assert!(!svg.contains("player"));
 }
