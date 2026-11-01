@@ -227,9 +227,10 @@ sequenceDiagram
     participant Artwork as artwork.rs
     participant Archive as Piltover Archive API
     participant Cache as Artwork cache
+    participant Output as output.rs
     participant Layout as layout.rs
     participant Renderer as renderer.rs
-    participant Output as output files
+    participant Files as output files
 
     User->>CLI: Run with CLI arguments
     CLI->>Tournament: Read tournament metadata and counts
@@ -255,15 +256,16 @@ sequenceDiagram
     end
 
     CLI->>CLI: Exclude zero-count and unknown Legends, then sort by count
-    CLI->>Layout: Build tile positions and sizes
-    Layout-->>CLI: Legend tiles
-    CLI->>Renderer: Render tournament, tiles, and artwork
+    CLI->>Output: Generate SVG and PNG
+    Output->>Layout: Build tile positions and sizes
+    Layout-->>Output: Legend tiles
+    Output->>Renderer: Render tournament, tiles, and artwork
     Renderer->>Cache: Read available local artwork
     Cache-->>Renderer: Image files
     Renderer->>Renderer: Crop for display and generate SVG
-    Renderer-->>CLI: SVG content
-    CLI->>Output: Write SVG
-    CLI->>CLI: Parse SVG and rasterize to PNG
-    CLI->>Output: Write PNG
-    CLI-->>User: Report generated file paths
+    Renderer-->>Output: SVG content
+    Output->>Files: Write SVG
+    Output->>Output: Parse SVG and rasterize to PNG
+    Output->>Files: Write PNG
+    Output-->>User: Report generated file paths
 ```
