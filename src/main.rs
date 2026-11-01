@@ -1,59 +1,23 @@
 mod artwork;
+mod cli;
 mod config;
 mod layout;
 mod models;
+mod output;
 mod renderer;
 
-use crate::layout::{build_layout, LegendCount};
+use crate::cli::{resolve_filename, Args, OUTPUT_DIR, TOURNAMENT_DIR};
+use crate::layout::LegendCount;
 use crate::models::{Legend, TournamentFile};
-use crate::renderer::render_svg;
-use anyhow::{bail, Context, Result};
+use crate::output::write_outputs;
+#[cfg(test)]
+use crate::output::{ensure_parent_dir, render_png};
+use anyhow::{Context, Result};
 use clap::Parser;
-use std::{
-    collections::HashMap,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, fs, path::Path};
 
-const TOURNAMENT_DIR: &str = "../DataFiles/RiftboundTournaments";
-const OUTPUT_DIR: &str = "../DataFiles/RiftboundTournaments/TournamentOutput";
 const LEGENDS_FILE: &str = "data/legends.json";
 const ASSETS_DIR: &str = "../DataFiles/RiftboundAssets/legends";
-
-#[derive(Parser, Debug)]
-#[command(
-    name = "riftbound_meta",
-    version,
-    about = "Generate a Riftbound Legend meta breakdown PNG."
-)]
-struct Args {
-    #[arg(
-        default_value = "tournament.json",
-        help = "Tournament JSON filename in ../DataFiles/RiftboundTournaments."
-    )]
-    tournament: PathBuf,
-    #[arg(
-        long,
-        default_value = "meta.png",
-        help = "PNG output filename in ../DataFiles/RiftboundTournaments/TournamentOutput."
-    )]
-    output: PathBuf,
-    #[arg(
-        long,
-        help = "SVG output filename. Defaults to the PNG filename with .svg."
-    )]
-    svg: Option<PathBuf>,
-    #[arg(
-        long,
-        help = "Do not contact Piltover Archive; render using cached/local artwork only."
-    )]
-    skip_artwork: bool,
-    #[arg(
-        long,
-        help = "Re-download artwork even when a cached file already exists."
-    )]
-    refresh_artwork: bool,
-}
 
 fn load_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
     let contents =
@@ -88,17 +52,6 @@ fn run(args: Args) -> Result<()> {
         &output_path,
         &svg_path,
     )
-}
-
-fn resolve_filename(directory: &str, filename: &Path, label: &str) -> Result<PathBuf> {
-    let mut components = filename.components();
-    if !matches!(components.next(), Some(std::path::Component::Normal(_)))
-        || components.next().is_some()
-    {
-        bail!("{label} must be a filename only; directory paths are not accepted");
-    }
-
-    Ok(Path::new(directory).join(filename))
 }
 
 fn prepare_legends(
@@ -149,58 +102,6 @@ fn sync_artwork_if_enabled(
             assets_dir.display()
         );
     }
-}
-
-fn write_outputs(
-    tournament: &TournamentFile,
-    legend_db: &HashMap<String, Legend>,
-    legends: &[LegendCount],
-    assets_dir: &Path,
-    output_path: &Path,
-    svg_path: &Path,
-) -> Result<()> {
-    let tiles = build_layout(legends);
-    let svg = render_svg(&tournament.tournament, legend_db, &tiles, assets_dir)?;
-
-    ensure_parent_dir(output_path)?;
-    ensure_parent_dir(svg_path)?;
-
-    fs::write(svg_path, &svg).with_context(|| format!("Could not write {}", svg_path.display()))?;
-
-    render_png(&svg, output_path)?;
-
-    println!("Generated: {}", output_path.display());
-    println!("SVG:       {}", svg_path.display());
-
-    Ok(())
-}
-
-fn ensure_parent_dir(path: &Path) -> Result<()> {
-    if let Some(parent) = path
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-    {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Could not create directory {}", parent.display()))?;
-    }
-
-    Ok(())
-}
-
-fn render_png(svg: &str, output: &Path) -> Result<()> {
-    let opt = resvg::usvg::Options::default();
-    let tree = resvg::usvg::Tree::from_str(svg, &opt).context("Could not parse generated SVG")?;
-    let mut pixmap = resvg::tiny_skia::Pixmap::new(config::CANVAS_WIDTH, config::CANVAS_HEIGHT)
-        .context("Could not allocate output image")?;
-
-    resvg::render(
-        &tree,
-        resvg::tiny_skia::Transform::default(),
-        &mut pixmap.as_mut(),
-    );
-    pixmap
-        .save_png(output)
-        .with_context(|| format!("Could not write {}", output.display()))
 }
 
 #[cfg(test)]

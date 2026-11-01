@@ -100,7 +100,7 @@ fn svg_escapes_legend_fields_and_uses_faction_color() {
 
     assert!(svg.contains("AHRI &amp; FRIENDS"));
     assert!(svg.contains("The &lt;Fox&gt;"));
-    assert!(svg.contains("stroke=\"#C84B55\""));
+    assert!(svg.contains("stroke=\"#D64045\""));
     assert!(svg.contains(">7</text>"));
     assert!(!svg.contains("data:image/png;base64,"));
 }

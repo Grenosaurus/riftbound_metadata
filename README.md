@@ -1,8 +1,26 @@
 # Riftbound Meta Generator
 
-This Rust command-line program reads tournament and Legend metadata from JSON, optionally downloads missing Legend artwork from Piltover Archive, and generates a 1920×1080 PNG and SVG meta breakdown.
+This Rust command-line tool turns a Riftbound tournament JSON file into a polished 1920×1080 tournament meta card. It reads the tournament and Legend metadata, filters out zero-count entries, optionally syncs missing artwork from Piltover Archive, and writes both a PNG and an SVG output.
 
-The output includes the tournament name and shows the player count when it is at least two. The tournament date is shown when one is provided. Only Legends with counts greater than zero are included in the output or considered for artwork downloads.
+The final image includes the tournament name, shows the player count when it is at least two, and prints the tournament date when one is provided. Legends with counts greater than zero are the only entries included in the output or considered for artwork downloads.
+
+## Quick start
+
+1. Make sure the project has access to the expected input and cache directories:
+   - Tournament JSON: `../DataFiles/RiftboundTournaments`
+   - Legend database: `data/legends.json`
+   - Artwork cache: `../DataFiles/RiftboundAssets/legends`
+2. Place your tournament JSON file in the tournament directory (for example `tournament.json`).
+3. Run the tool from the project directory:
+
+```powershell
+cargo run
+```
+
+By default, the tool writes:
+
+- PNG: `../DataFiles/RiftboundTournaments/TournamentOutput/meta.png`
+- SVG: `../DataFiles/RiftboundTournaments/TournamentOutput/meta.svg`
 
 ## Requirements
 
@@ -154,10 +172,12 @@ riftbound_metadata/
 ├── README.md
 ├── src/
 │   ├── main.rs
+│   ├── cli.rs
 │   ├── config.rs
 │   ├── models.rs
 │   ├── layout.rs
 │   ├── renderer.rs
+│   ├── output.rs
 │   └── artwork.rs
 ├── tests/
 │   ├── cli.rs
@@ -186,11 +206,13 @@ are supplied on the command line.
 
 ## Program architecture
 
-`main.rs` parses arguments and coordinates the workflow. It loads the JSON
-inputs, optionally synchronizes missing artwork, filters and sorts Legends,
-builds the tile layout, writes the SVG, and rasterizes it to PNG. The rendering
-and artwork-sync failures are reported with context; artwork-sync failures are
-warnings so rendering can continue with cached files.
+`cli.rs` defines command-line arguments and validates filename-only paths.
+`main.rs` coordinates the workflow: it loads the JSON inputs, optionally
+synchronizes missing artwork, and filters and sorts Legends. `layout.rs` builds
+tile positions, `renderer.rs` creates the SVG, and `output.rs` writes the SVG
+and rasterizes it to PNG. Rendering and artwork-sync failures are reported with
+context; artwork-sync failures are warnings so rendering can continue with
+cached files.
 
 Unit tests are stored under `tests/unit/` and included by their corresponding
 source modules when testing. Shared unit-test utilities are in

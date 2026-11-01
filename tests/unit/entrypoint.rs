@@ -1,5 +1,6 @@
 use super::*;
 use crate::test_support::TestDir;
+use std::path::PathBuf;
 
 fn legend(name: &str) -> Legend {
     Legend {
